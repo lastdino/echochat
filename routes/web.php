@@ -1,8 +1,8 @@
 <?php
 
-use EchoChat\Models\Workspace;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
+use Livewire\Volt\Volt;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 Route::middleware(['web', 'auth'])->group(function () {
@@ -33,12 +33,9 @@ Route::middleware(['web', 'auth'])->group(function () {
         );
     })->name('echochat.attachments.show');
 
-    Route::get('/echochat/{workspace:slug}/{channel?}', function (Workspace $workspace, $channel = null) {
-        Gate::authorize('view', $workspace);
+    Volt::route('/echochat/workspaces', 'workspace-list')
+        ->name('echochat.workspaces');
 
-        return view('echochat::chat-page', [
-            'workspace' => $workspace,
-            'channel' => $channel ? $workspace->channels()->where('name', $channel)->first() : null,
-        ]);
-    })->name('echochat.chat');
+    Volt::route('/echochat/{workspace:slug}/{channel?}', 'chat')
+        ->name('echochat.chat');
 });

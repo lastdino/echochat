@@ -74,15 +74,23 @@ new class extends Component
         $currentUserId = auth()->id();
 
         // 既存のDMチャンネルを探す
-        $channel = Channel::where('workspace_id', $this->workspace->id)
+        $query = Channel::where('workspace_id', $this->workspace->id)
             ->where('is_dm', true)
             ->whereHas('members', function ($query) use ($currentUserId) {
                 $query->where('user_id', $currentUserId);
-            })
-            ->whereHas('members', function ($query) use ($userId) {
+            });
+
+        if ($userId === $currentUserId) {
+            // 自分自身とのDMの場合は、メンバー数が1であることを確認
+            $query->has('members', 1);
+        } else {
+            // 他者とのDMの場合は、相手も含まれていることを確認
+            $query->whereHas('members', function ($query) use ($userId) {
                 $query->where('user_id', $userId);
-            })
-            ->first();
+            });
+        }
+
+        $channel = $query->first();
 
         if (! $channel) {
             // 新規作成
@@ -118,9 +126,24 @@ new class extends Component
             ['last_read_at' => now()]
         );
     }
+
+    public function removeMember($userId)
+    {
+        $this->authorize('removeMember', $this->workspace);
+
+        // チャンネルからも削除
+        $channelIds = $this->workspace->channels()->pluck('id');
+        \EchoChat\Models\ChannelMember::whereIn('channel_id', $channelIds)
+            ->where('user_id', $userId)
+            ->delete();
+
+        $this->workspace->members()->detach($userId);
+
+        $this->dispatch('workspaceMemberAdded'); // メンバーリスト更新のために同じイベントを使う
+    }
 }; ?>
 
-<div class="flex flex-col h-full">
+<div class="flex flex-col h-full" x-data="{ open: false, x: 0, y: 0, memberId: null, memberName: '' }">
     <div class="p-4 border-b border-zinc-200 dark:border-zinc-700">
         <h1 class="font-bold text-xl dark:text-white truncate">{{ $workspace->name }}</h1>
     </div>
@@ -163,9 +186,15 @@ new class extends Component
                 @php
                     $ownerDmChannel = \EchoChat\Models\Channel::where('workspace_id', $workspace->id)
                         ->where('is_dm', true)
-                        ->whereHas('members', fn($q) => $q->where('user_id', auth()->id()))
-                        ->whereHas('members', fn($q) => $q->where('user_id', $workspace->owner->id))
-                        ->first();
+                        ->whereHas('members', fn($q) => $q->where('user_id', auth()->id()));
+
+                    if ($workspace->owner->id === auth()->id()) {
+                        $ownerDmChannel->has('members', 1);
+                    } else {
+                        $ownerDmChannel->whereHas('members', fn($q) => $q->where('user_id', $workspace->owner->id));
+                    }
+
+                    $ownerDmChannel = $ownerDmChannel->first();
                 @endphp
                 <flux:navlist.item
                     wire:key="member-owner-{{ $workspace->owner->id }}"
@@ -174,8 +203,9 @@ new class extends Component
                     :badge="($ownerDmChannel && ($notifications[$ownerDmChannel->id] ?? 0) > 0) ? $notifications[$ownerDmChannel->id] : null"
                     badge:color="blue"
                 >
+
                     <x-slot name="icon">
-                        <flux:avatar size="xs" :name="$workspace->owner->name" />
+                        <flux:avatar size="xs" :name="$workspace->owner->name" src="{{$workspace->owner->getUserAvatar()}}"/>
                     </x-slot>
                     {{ $workspace->owner->name }} {{ $workspace->owner->id === auth()->id() ? '(自分)' : '' }}
                 </flux:navlist.item>
@@ -184,30 +214,56 @@ new class extends Component
                     @php
                         $memberDmChannel = \EchoChat\Models\Channel::where('workspace_id', $workspace->id)
                             ->where('is_dm', true)
-                            ->whereHas('members', fn($q) => $q->where('user_id', auth()->id()))
-                            ->whereHas('members', fn($q) => $q->where('user_id', $member->id))
-                            ->first();
+                            ->whereHas('members', fn($q) => $q->where('user_id', auth()->id()));
+
+                        if ($member->id === auth()->id()) {
+                            $memberDmChannel->has('members', 1);
+                        } else {
+                            $memberDmChannel->whereHas('members', fn($q) => $q->where('user_id', $member->id));
+                        }
+
+                        $memberDmChannel = $memberDmChannel->first();
                     @endphp
-                    <flux:navlist.item
-                        wire:key="member-{{ $member->id }}"
-                        wire:click="openDirectMessage({{ $member->id }})"
-                        :current="$activeChannel && $memberDmChannel && $activeChannel->id === $memberDmChannel->id"
-                        :badge="($memberDmChannel && ($notifications[$memberDmChannel->id] ?? 0) > 0) ? $notifications[$memberDmChannel->id] : null"
-                        badge:color="blue"
-                    >
-                        <x-slot name="icon">
-                            <flux:avatar size="xs" :name="$member->name" />
-                        </x-slot>
-                        {{ $member->name }} {{ $member->id === auth()->id() ? '(自分)' : '' }}
-                    </flux:navlist.item>
-                @endforeach
+                        @can('removeMember', $workspace)
+                            <flux:navlist.item
+                                wire:key="member-{{ $member->id }}"
+                                wire:click="openDirectMessage({{ $member->id }})"
+                                @contextmenu.prevent="open = true; x = $event.clientX; y = $event.clientY; memberId = {{ $member->id }}; memberName = '{{ $member->name }}'"
+                                :current="$activeChannel && $memberDmChannel && $activeChannel->id === $memberDmChannel->id"
+                                :badge="($memberDmChannel && ($notifications[$memberDmChannel->id] ?? 0) > 0) ? $notifications[$memberDmChannel->id] : null"
+                                badge:color="blue"
+                            >
+                                <x-slot name="icon">
+                                    <flux:avatar size="xs" :name="$member->name" src="{{$member->getUserAvatar()}}"/>
+                                </x-slot>
+
+                                {{ $member->name }} {{ $member->id === auth()->id() ? '(自分)' : '' }}
+                            </flux:navlist.item>
+                        @else
+                            <flux:navlist.item
+                                wire:key="member-{{ $member->id }}"
+                                wire:click="openDirectMessage({{ $member->id }})"
+                                :current="$activeChannel && $memberDmChannel && $activeChannel->id === $memberDmChannel->id"
+                                :badge="($memberDmChannel && ($notifications[$memberDmChannel->id] ?? 0) > 0) ? $notifications[$memberDmChannel->id] : null"
+                                badge:color="blue"
+                            >
+                                <x-slot name="icon">
+                                    <flux:avatar size="xs" :name="$member->name" src="{{$member->getUserAvatar()}}"/>
+                                </x-slot>
+
+                                {{ $member->name }} {{ $member->id === auth()->id() ? '(自分)' : '' }}
+                            </flux:navlist.item>
+                        @endcan
+                    @endforeach
 
                 @can('invite', $workspace)
-                    <flux:modal.trigger name="invite-workspace-member-modal">
-                        <flux:navlist.item icon="plus" class="text-zinc-500">
-                            チームメンバーを追加...
-                        </flux:navlist.item>
-                    </flux:modal.trigger>
+                    <div class="px-2 mt-2">
+                        <flux:modal.trigger name="invite-workspace-member-modal">
+                            <flux:button variant="subtle" icon="plus" class="w-full justify-start text-zinc-500">
+                                チームメンバーを追加...
+                            </flux:button>
+                        </flux:modal.trigger>
+                    </div>
                 @endcan
             </flux:navlist.group>
         </flux:navlist>
@@ -220,4 +276,25 @@ new class extends Component
     <flux:modal name="invite-workspace-member-modal" class="md:w-[500px]">
         <livewire:invite-workspace-member :workspace="$workspace" />
     </flux:modal>
+
+    {{-- Context Menu --}}
+    <div
+        x-show="open"
+        x-cloak
+        @click.away="open = false"
+        @keydown.escape.window="open = false"
+        x-bind:style="`position: fixed; left: ${x}px; top: ${y}px; z-index: 50;`"
+        class="min-w-48 p-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-md"
+    >
+        <flux:navlist>
+            <flux:navlist.item icon="trash"
+                               @click="
+                if (confirm(`${memberName}をワークスペースから削除しますか？`)) {
+                    $wire.removeMember(memberId);
+                }
+                open = false;
+            "
+            >削除</flux:navlist.item>
+        </flux:navlist>
+    </div>
 </div>

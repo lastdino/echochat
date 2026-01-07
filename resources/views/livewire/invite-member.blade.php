@@ -63,7 +63,7 @@ new class extends Component
             <div class="max-h-60 overflow-y-auto space-y-2">
                 @forelse($this->workspaceMembers as $member)
                     <label class="flex items-center gap-2 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 rounded cursor-pointer">
-                        <flux:checkbox wire:model="selectedUserIds" value="{{ $member->id }}" />
+                        <flux:checkbox wire:model.live="selectedUserIds" value="{{ $member->id }}" />
                         <div class="flex flex-col">
                             <span class="text-sm font-medium dark:text-white">{{ $member->name }}</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $member->email }}</span>

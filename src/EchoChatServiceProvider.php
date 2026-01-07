@@ -2,7 +2,9 @@
 
 namespace EchoChat;
 
+use EchoChat\Models\Channel;
 use EchoChat\Models\Workspace;
+use EchoChat\Policies\ChannelPolicy;
 use EchoChat\Policies\WorkspacePolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -21,6 +23,7 @@ class EchoChatServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(Workspace::class, WorkspacePolicy::class);
+        Gate::policy(Channel::class, ChannelPolicy::class);
 
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'echochat');

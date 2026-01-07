@@ -52,7 +52,7 @@ new class extends Component
 <div class="p-4 space-y-4">
     @foreach($messages as $message)
         <div id="message-{{ $message->id }}" class="flex items-start gap-3 group/message transition-colors duration-500" wire:key="message-{{ $message->id }}">
-            <flux:avatar size="sm" :name="$message->user->name" />
+            <flux:avatar size="sm" :name="$message->user->name" src="{{$message->user->getUserAvatar()}}"/>
             <div class="min-w-0 flex-1">
                 @if($message->parent)
                     <a href="#message-{{ $message->parent_id }}" class="flex items-center gap-1 text-xs text-zinc-500 mb-1 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors" @click.prevent="document.getElementById('message-{{ $message->parent_id }}')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); const el = document.getElementById('message-{{ $message->parent_id }}'); el.classList.add('bg-zinc-100', 'dark:bg-zinc-800'); setTimeout(() => el.classList.remove('bg-zinc-100', 'dark:bg-zinc-800'), 2000)">
