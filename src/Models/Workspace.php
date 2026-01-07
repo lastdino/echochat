@@ -6,6 +6,7 @@ use App\Models\User;
 use EchoChat\Support\Tables;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Workspace extends Model
@@ -25,5 +26,11 @@ class Workspace extends Model
     public function channels(): HasMany
     {
         return $this->hasMany(Channel::class);
+    }
+
+    public function members(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, Tables::name('workspace_members'))
+            ->withTimestamps();
     }
 }

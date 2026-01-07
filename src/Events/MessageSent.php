@@ -18,6 +18,7 @@ class MessageSent implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
+            new PrivateChannel('workspace.'.$this->message->channel->workspace_id),
             new PrivateChannel('workspace.'.$this->message->channel->workspace_id.'.channel.'.$this->message->channel_id),
         ];
     }
@@ -29,6 +30,7 @@ class MessageSent implements ShouldBroadcast
             'content' => $this->message->content,
             'user_name' => $this->message->user->name,
             'channel_id' => $this->message->channel_id,
+            'parent_id' => $this->message->parent_id,
             'created_at' => $this->message->created_at->toDateTimeString(),
         ];
     }

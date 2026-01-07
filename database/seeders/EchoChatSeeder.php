@@ -2,10 +2,9 @@
 
 namespace EchoChat\Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\User;
 use EchoChat\Models\Workspace;
-use EchoChat\Models\Channel;
+use Illuminate\Database\Seeder;
 
 class EchoChatSeeder extends Seeder
 {

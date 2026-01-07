@@ -8,13 +8,17 @@ final class Tables
 {
     public static function prefix(): string
     {
-        $configured = (string) (config('echochat.table_prefix') ?? '');
-
-        return $configured !== '' ? $configured : 'echochat_';
+        return (string) (config('echochat.table_prefix') ?? 'echochat_');
     }
 
     public static function name(string $base): string
     {
+        $configured = config("echochat.tables.{$base}");
+
+        if ($configured) {
+            return $configured;
+        }
+
         return self::prefix().$base;
     }
 }

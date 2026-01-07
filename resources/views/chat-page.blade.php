@@ -1,3 +1,5 @@
-<x-layouts.app>
-    <livewire:chat :workspace="$workspace" :channel="$channel" />
-</x-layouts.app>
+<x-layouts.app.sidebar>
+    <flux:main >
+        <livewire:chat :workspace="$workspace" :channel="$channel" />
+    </flux:main>
+</x-layouts.app.sidebar>

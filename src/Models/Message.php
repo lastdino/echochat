@@ -6,15 +6,25 @@ use App\Models\User;
 use EchoChat\Support\Tables;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Message extends Model
+class Message extends Model implements HasMedia
 {
+    use InteractsWithMedia;
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('attachments')
+            ->useDisk('local');
+    }
+
     public function getTable()
     {
         return Tables::name('messages');
     }
 
-    protected $fillable = ['channel_id', 'user_id', 'content'];
+    protected $fillable = ['channel_id', 'user_id', 'parent_id', 'content'];
 
     public function channel(): BelongsTo
     {
@@ -23,6 +33,16 @@ class Message extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(config('echochat.models.user', User::class));
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Message::class, 'parent_id');
+    }
+
+    public function replies(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Message::class, 'parent_id');
     }
 }

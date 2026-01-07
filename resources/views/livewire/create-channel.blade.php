@@ -4,6 +4,7 @@ use EchoChat\Models\Workspace;
 use EchoChat\Models\Channel;
 use Livewire\Volt\Component;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Gate;
 
 new class extends Component {
     public Workspace $workspace;
@@ -12,14 +13,20 @@ new class extends Component {
 
     public function createChannel()
     {
+        Gate::authorize('update', $this->workspace);
+
         $this->validate([
             'name' => 'required|string|max:255',
         ]);
 
         $channel = $this->workspace->channels()->create([
-            'name' => Str::slug($this->name),
+            'name' => $this->name,
             'is_private' => $this->is_private,
             'creator_id' => auth()->id(),
+        ]);
+
+        $channel->members()->create([
+            'user_id' => auth()->id(),
         ]);
 
         $this->name = '';
@@ -35,15 +42,18 @@ new class extends Component {
     <h3 class="text-lg font-bold mb-4 dark:text-white">新しいチャンネルを作成</h3>
     <form wire:submit.prevent="createChannel">
         <div class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">チャンネル名</label>
-                <input type="text" wire:model="name" class="mt-1 block w-full rounded-md border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500">
+            <flux:field>
+                <flux:label>チャンネル名</flux:label>
+                <flux:input wire:model="name" placeholder="例: プロジェクトA" />
+                <flux:error name="name" />
+            </flux:field>
+
+            <flux:checkbox wire:model="is_private" label="プライベートにする" />
+
+            <div class="flex">
+                <flux:spacer />
+                <flux:button type="submit" variant="primary">作成</flux:button>
             </div>
-            <div class="flex items-center">
-                <input type="checkbox" wire:model="is_private" class="rounded border-zinc-300 text-blue-600 focus:ring-blue-500">
-                <label class="ml-2 block text-sm text-zinc-900 dark:text-zinc-300">プライベートにする</label>
-            </div>
-            <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors">作成</button>
         </div>
     </form>
 </div>
