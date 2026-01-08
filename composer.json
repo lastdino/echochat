@@ -1,5 +1,5 @@
 {
-    "name": "echochat/echochat",
+    "name": "lastdino/echochat",
     "description": "A Slack-like functionality package for Laravel.",
     "type": "library",
     "license": "MIT",
