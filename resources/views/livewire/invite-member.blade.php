@@ -42,9 +42,10 @@ new class extends Component
                 'user_id' => $user->id,
             ]);
 
+            $userName = \EchoChat\Support\UserSupport::getName($user);
             $this->channel->messages()->create([
                 'user_id' => auth()->id(),
-                'content' => "{$user->name}を招待しました",
+                'content' => "{$userName}を招待しました",
             ]);
         }
 
@@ -65,7 +66,7 @@ new class extends Component
                     <label class="flex items-center gap-2 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 rounded cursor-pointer">
                         <flux:checkbox wire:model.live="selectedUserIds" value="{{ $member->id }}" />
                         <div class="flex flex-col">
-                            <span class="text-sm font-medium dark:text-white">{{ $member->name }}</span>
+                            <span class="text-sm font-medium dark:text-white">{{ \EchoChat\Support\UserSupport::getName($member) }}</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $member->email }}</span>
                         </div>
                     </label>

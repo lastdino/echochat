@@ -16,7 +16,12 @@ class Workspace extends Model
         return Tables::name('workspaces');
     }
 
-    protected $fillable = ['name', 'slug', 'owner_id'];
+    protected $fillable = ['name', 'slug', 'owner_id', 'allow_member_channel_creation', 'allow_member_channel_deletion'];
+
+    protected $casts = [
+        'allow_member_channel_creation' => 'boolean',
+        'allow_member_channel_deletion' => 'boolean',
+    ];
 
     public function owner(): BelongsTo
     {
@@ -32,5 +37,38 @@ class Workspace extends Model
     {
         return $this->belongsToMany(User::class, Tables::name('workspace_members'))
             ->withTimestamps();
+    }
+
+    public function getUnreadCountAttribute(): int
+    {
+        $userId = auth()->id();
+        if (! $userId) {
+            return 0;
+        }
+
+        // キャッシュされたリレーションではなく、常にクエリを発行して最新の状態を取得する
+        $channels = $this->channels()->get();
+        $totalUnread = 0;
+
+        foreach ($channels as $channel) {
+            // プライベートチャンネルの場合はメンバーである必要がある
+            if ($channel->is_private && ! $channel->isMember($userId)) {
+                continue;
+            }
+
+            $lastRead = ChannelUser::where('channel_id', $channel->id)
+                ->where('user_id', $userId)
+                ->first()?->last_read_at;
+
+            $query = $channel->messages()->where('user_id', '!=', $userId);
+
+            if ($lastRead) {
+                $query->where('created_at', '>', $lastRead);
+            }
+
+            $totalUnread += $query->count();
+        }
+
+        return $totalUnread;
     }
 }

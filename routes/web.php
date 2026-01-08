@@ -6,7 +6,9 @@ use Livewire\Volt\Volt;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 Route::middleware(['web', 'auth'])->group(function () {
-    Route::get('/echochat/attachments/{media:uuid}', function (Media $media) {
+    $path = config('echochat.path', 'echochat');
+
+    Route::get($path.'/attachments/{media:uuid}', function (Media $media) {
         $message = $media->model;
 
         if (! $message instanceof \EchoChat\Models\Message) {
@@ -33,9 +35,12 @@ Route::middleware(['web', 'auth'])->group(function () {
         );
     })->name('echochat.attachments.show');
 
-    Volt::route('/echochat/workspaces', 'workspace-list')
+    Volt::route($path.'/workspaces', 'workspace-list')
         ->name('echochat.workspaces');
 
-    Volt::route('/echochat/{workspace:slug}/{channel?}', 'chat')
+    Volt::route($path.'/{workspace:slug}/settings', 'workspace-settings')
+        ->name('echochat.workspaces.settings');
+
+    Volt::route($path.'/{workspace:slug}/{channel?}', 'chat')
         ->name('echochat.chat');
 });

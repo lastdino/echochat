@@ -55,7 +55,7 @@ new class extends Component {
                     <label class="flex items-center gap-2 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 rounded cursor-pointer">
                         <flux:checkbox wire:model.live="selectedUserIds" value="{{ $user->id }}" />
                         <div class="flex flex-col">
-                            <span class="text-sm font-medium dark:text-white">{{ $user->name }}</span>
+                            <span class="text-sm font-medium dark:text-white">{{ \EchoChat\Support\UserSupport::getName($user) }}</span>
                             <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $user->email }}</span>
                         </div>
                     </label>

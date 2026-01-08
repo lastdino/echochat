@@ -23,7 +23,25 @@ class WorkspacePolicy
         return $workspace->owner_id === $user->id;
     }
 
+    public function createChannel(User $user, Workspace $workspace): bool
+    {
+        if ($workspace->owner_id === $user->id) {
+            return true;
+        }
+
+        if ($workspace->allow_member_channel_creation) {
+            return $workspace->members()->where('user_id', $user->id)->exists();
+        }
+
+        return false;
+    }
+
     public function removeMember(User $user, Workspace $workspace): bool
+    {
+        return $workspace->owner_id === $user->id;
+    }
+
+    public function transferOwnership(User $user, Workspace $workspace): bool
     {
         return $workspace->owner_id === $user->id;
     }

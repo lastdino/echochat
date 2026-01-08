@@ -6,6 +6,7 @@ use App\Models\User;
 use EchoChat\Support\Tables;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
@@ -41,8 +42,13 @@ class Message extends Model implements HasMedia
         return $this->belongsTo(Message::class, 'parent_id');
     }
 
-    public function replies(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function replies(): HasMany
     {
         return $this->hasMany(Message::class, 'parent_id');
+    }
+
+    public function reactions(): HasMany
+    {
+        return $this->hasMany(MessageReaction::class);
     }
 }

@@ -2,6 +2,7 @@
 
 use EchoChat\Models\Channel;
 use EchoChat\Models\Workspace;
+use EchoChat\Services\AIModelService;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Volt\Component;
 
@@ -10,6 +11,14 @@ new class extends Component
     public Workspace $workspace;
 
     public ?Channel $activeChannel = null;
+
+    public string $summary = '';
+
+    public bool $isSummarizing = false;
+
+    public string $search = '';
+
+    public bool $isSearching = false;
 
     public function mount(Workspace $workspace, ?string $channel = null)
     {
@@ -39,6 +48,41 @@ new class extends Component
     public function selectChannel($channelId)
     {
         $this->activeChannel = Channel::with('members.user')->find($channelId);
+        $this->summary = '';
+        $this->search = '';
+        $this->isSearching = false;
+    }
+
+    public function updatedSearch()
+    {
+        $this->dispatch('searchMessages', search: $this->search)->to('message-feed');
+    }
+
+    public function toggleSearch()
+    {
+        $this->isSearching = ! $this->isSearching;
+        if (! $this->isSearching) {
+            $this->search = '';
+            $this->updatedSearch();
+        }
+    }
+
+    public function summarize(AIModelService $aiService)
+    {
+        if (! $this->activeChannel) {
+            return;
+        }
+
+        $this->isSummarizing = true;
+        $this->summary = '';
+
+        try {
+            $this->summary = $aiService->summarizeChannel($this->activeChannel);
+        } catch (\Exception $e) {
+            $this->summary = 'エラーが発生しました: '.$e->getMessage();
+        } finally {
+            $this->isSummarizing = false;
+        }
     }
 
     public function joinChannel()
@@ -107,9 +151,55 @@ new class extends Component
                                     <flux:button variant="subtle" size="sm" icon="user-plus" square/>
                                 </flux:modal.trigger>
                             @endif
+
+                            <flux:button wire:click="toggleSearch" variant="subtle" size="sm" icon="magnifying-glass" square title="検索" :class="$isSearching ? 'text-blue-600' : ''" />
+
+                            <flux:button wire:click="summarize" variant="subtle" size="sm" icon="sparkles" square title="AIで要約" />
+                        </div>
+                    @else
+                        <div class="flex items-center gap-2">
+                            <flux:button wire:click="toggleSearch" variant="subtle" size="sm" icon="magnifying-glass" square title="検索" :class="$isSearching ? 'text-blue-600' : ''" />
                         </div>
                     @endif
                 </div>
+
+                @if($isSearching)
+                    <div class="px-4 py-2 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700">
+                        <flux:input
+                            wire:model.live.debounce.300ms="search"
+                            placeholder="メッセージを検索..."
+                            icon="magnifying-glass"
+                            size="sm"
+                            autofocus
+                        />
+                    </div>
+                @endif
+
+                @if($summary)
+                    <div class="px-4 py-2 bg-indigo-50 dark:bg-indigo-950 border-b border-indigo-100 dark:border-indigo-900">
+                        <div class="flex items-start gap-2">
+                            <flux:icon icon="sparkles" class="w-4 h-4 text-indigo-500 mt-1 shrink-0" />
+                            <div class="flex-1">
+                                <h4 class="text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-1 flex justify-between">
+                                    AIによる要約
+                                    <button wire:click="$set('summary', '')" class="text-zinc-400 hover:text-zinc-600">
+                                        <flux:icon icon="x-mark" class="w-3 h-3" />
+                                    </button>
+                                </h4>
+                                <p class="text-sm text-indigo-900 dark:text-indigo-100 whitespace-pre-wrap">{{ $summary }}</p>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                @if($isSummarizing)
+                    <div class="px-4 py-2 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700">
+                        <div class="flex items-center gap-2 text-zinc-500 text-sm italic">
+                            <flux:icon icon="sparkles" class="w-4 h-4 animate-pulse" />
+                            要約を作成中...
+                        </div>
+                    </div>
+                @endif
 
                 <div class="flex-1 overflow-y-auto flex flex-col-reverse">
                     <div>

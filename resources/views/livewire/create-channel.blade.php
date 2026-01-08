@@ -13,7 +13,7 @@ new class extends Component {
 
     public function createChannel()
     {
-        Gate::authorize('update', $this->workspace);
+        Gate::authorize('createChannel', $this->workspace);
 
         $this->validate([
             'name' => 'required|string|max:255',

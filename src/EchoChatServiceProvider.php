@@ -29,6 +29,10 @@ class EchoChatServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'echochat');
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
 
+        if (file_exists(__DIR__.'/../routes/channels.php')) {
+            require __DIR__.'/../routes/channels.php';
+        }
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__.'/../config/echochat.php' => config_path('echochat.php'),
@@ -37,6 +41,14 @@ class EchoChatServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../resources/views' => resource_path('views/vendor/echochat'),
             ], 'echochat-views');
+
+            $this->publishes([
+                __DIR__.'/../dist/echochat.css' => public_path('vendor/echochat/echochat.css'),
+            ], 'echochat-assets');
+
+            $this->publishes([
+                __DIR__.'/../resources/views/flux/icon/smile-plus.blade.php' => resource_path('views/flux/icon/smile-plus.blade.php'),
+            ], 'echochat-flux-icons');
         }
 
         // Register Volt components

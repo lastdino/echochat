@@ -62,12 +62,14 @@ new class extends Component
         );
 
         broadcast(new MessageSent($message->load('media')))->toOthers();
+        broadcast(new \EchoChat\Events\ChannelRead($this->channel, auth()->id()))->toOthers();
 
         $this->content = '';
         $this->attachments = [];
         $this->replyToId = null;
         $this->replyToMessage = null;
         $this->dispatch('messageSent');
+        $this->dispatch('channelRead', channelId: $this->channel->id);
     }
 
     public function removeAttachment($index)

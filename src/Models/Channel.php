@@ -4,6 +4,7 @@ namespace EchoChat\Models;
 
 use App\Models\User;
 use EchoChat\Support\Tables;
+use EchoChat\Support\UserSupport;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -79,10 +80,10 @@ class Channel extends Model
                 ->first();
 
             if ($otherMember) {
-                return $otherMember->user->name;
+                return UserSupport::getName($otherMember->user);
             }
 
-            return auth()->user()->name.' (自分)';
+            return UserSupport::getName(auth()->user()).' (自分)';
         }
 
         return $this->name ?? '';
