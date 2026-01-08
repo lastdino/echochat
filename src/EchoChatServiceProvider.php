@@ -52,8 +52,14 @@ class EchoChatServiceProvider extends ServiceProvider
         }
 
         // Register Volt components
-        Volt::mount([
-            __DIR__.'/../resources/views/livewire',
-        ]);
+        $voltPaths = [];
+
+        if (is_dir(resource_path('views/vendor/echochat/livewire'))) {
+            $voltPaths[] = resource_path('views/vendor/echochat/livewire');
+        }
+
+        $voltPaths[] = __DIR__.'/../resources/views/livewire';
+
+        Volt::mount($voltPaths);
     }
 }
