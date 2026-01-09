@@ -5,12 +5,8 @@ use EchoChat\Events\MessageSent;
 use EchoChat\Models\ChannelUser;
 use EchoChat\Models\Workspace;
 use EchoChat\Support\Tables;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Livewire\Volt\Volt;
-use Tests\TestCase;
-
-uses(TestCase::class, RefreshDatabase::class);
 
 test('chat component can be rendered', function () {
     $user = User::factory()->create();
@@ -241,6 +237,7 @@ test('joining a public channel creates a message', function () {
         'slug' => 'test-workspace',
         'owner_id' => User::factory()->create()->id,
     ]);
+    $workspace->members()->attach($user->id);
     $channel = $workspace->channels()->create([
         'name' => 'general',
         'creator_id' => $workspace->owner_id,
@@ -248,7 +245,7 @@ test('joining a public channel creates a message', function () {
     ]);
 
     Volt::actingAs($user)
-        ->test('chat', ['workspace' => $workspace, 'channel' => $channel])
+        ->test('chat', ['workspace' => $workspace, 'channel' => 'general'])
         ->call('joinChannel')
         ->assertDispatched('messageSent');
 
@@ -256,6 +253,34 @@ test('joining a public channel creates a message', function () {
         'channel_id' => $channel->id,
         'user_id' => $user->id,
         'content' => "# {$channel->name} に参加しました",
+    ]);
+});
+
+test('joining a public channel hides the join button', function () {
+    $user = User::factory()->create();
+    $workspace = Workspace::create([
+        'name' => 'Test Workspace',
+        'slug' => 'test-workspace',
+        'owner_id' => User::factory()->create()->id,
+    ]);
+    $workspace->members()->attach($user->id);
+    $channel = $workspace->channels()->create([
+        'name' => 'general',
+        'creator_id' => $workspace->owner_id,
+        'is_private' => false,
+    ]);
+
+    Volt::actingAs($user)
+        ->test('chat', ['workspace' => $workspace, 'channel' => 'general'])
+        ->assertSee('に参加しますか？')
+        ->assertSee('チャンネルに参加する')
+        ->call('joinChannel')
+        ->assertDontSee('に参加しますか？')
+        ->assertDontSee('チャンネルに参加する');
+
+    $this->assertDatabaseHas(Tables::name('channel_members'), [
+        'channel_id' => $channel->id,
+        'user_id' => $user->id,
     ]);
 });
 

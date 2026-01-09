@@ -97,7 +97,7 @@ new class extends Component
                 'content' => "# {$this->activeChannel->name} に参加しました",
             ]);
 
-            $this->activeChannel = Channel::find($this->activeChannel->id);
+            $this->activeChannel->load('members.user');
             $this->dispatch('channelCreated'); // サイドバーを更新するため
             $this->dispatch('messageSent'); // メッセージフィードを更新するため
         }
