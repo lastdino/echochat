@@ -101,7 +101,7 @@ new class extends Component
 
 <div class="p-4 space-y-4">
     @foreach($groupedMessages as $date => $messages)
-        <div x-data="{ open: true }" class="space-y-4">
+        <div x-data="{ open: true }" class="space-y-4" wire:key="date-group-{{ $channel->id }}-{{ Str::slug($date) }}">
             <div class="flex items-center gap-4 my-4 group/date cursor-pointer select-none" @click="open = !open">
                 <div class="flex-1 border-t border-zinc-200 dark:border-zinc-700"></div>
                 <div class="flex items-center gap-2">

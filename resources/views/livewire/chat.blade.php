@@ -134,7 +134,7 @@ new class extends Component
     <!-- Main Chat Area -->
     <div class="flex-1 flex flex-col min-w-0">
         @if($activeChannel)
-            <div class="flex-1 flex flex-col overflow-hidden">
+            <div class="flex-1 flex flex-col overflow-hidden" wire:key="active-channel-{{ $activeChannel->id }}">
                 <div class="p-4 border-b border-zinc-200 dark:border-zinc-700 flex justify-between items-center">
                     <div class="flex items-center gap-3 min-w-0">
                         <!-- Sidebar toggle for mobile -->
@@ -196,13 +196,13 @@ new class extends Component
                 </div>
 
                 @if($isSearching)
-                    <div class="px-4 py-2 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700">
+                    <div class="px-4 py-2 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700" wire:key="search-bar">
                         <flux:input
+                            x-init="$el.querySelector('input')?.focus()"
                             wire:model.live.debounce.300ms="search"
                             placeholder="メッセージを検索..."
                             icon="magnifying-glass"
                             size="sm"
-                            autofocus
                         />
                     </div>
                 @endif
@@ -262,6 +262,7 @@ new class extends Component
                         <livewire:message-input :channel="$activeChannel" wire:key="input-{{ $activeChannel->id }}"/>
                     @elseif($activeChannel->canJoin(auth()->id()))
                         <div
+                            wire:key="join-{{ $activeChannel->id }}"
                             class="bg-zinc-50 dark:bg-zinc-800 p-8 rounded-lg border border-zinc-200 dark:border-zinc-700 text-center">
                             <h3 class="text-zinc-900 dark:text-white font-bold mb-2"># {{ $activeChannel->name }}
                                 に参加しますか？</h3>
@@ -271,6 +272,7 @@ new class extends Component
                         </div>
                     @else
                         <div
+                            wire:key="restricted-{{ $activeChannel->id }}"
                             class="bg-zinc-50 dark:bg-zinc-800 p-8 rounded-lg border border-zinc-200 dark:border-zinc-700 text-center text-zinc-500">
                             このプライベートチャンネルを閲覧する権限がありません。
                         </div>
@@ -290,7 +292,7 @@ new class extends Component
                 @endcan
             </div>
         @else
-            <div class="flex-1 flex items-center justify-center">
+            <div class="flex-1 flex items-center justify-center" wire:key="no-active-channel">
                 <p class="text-zinc-500">チャンネルを選択してください</p>
             </div>
         @endif

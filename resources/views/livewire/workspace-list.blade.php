@@ -36,9 +36,13 @@ new class extends Component
         ]);
 
         // 初期チャンネルの作成
-        $workspace->channels()->create([
+        $channel = $workspace->channels()->create([
             'name' => '一般',
             'creator_id' => auth()->id(),
+        ]);
+
+        $channel->members()->create([
+            'user_id' => auth()->id(),
         ]);
 
         $this->name = '';
