@@ -51,6 +51,7 @@ new class extends Component
         $this->summary = '';
         $this->search = '';
         $this->isSearching = false;
+        $this->dispatch('channel-selected');
     }
 
     public function updatedSearch()
@@ -232,7 +233,25 @@ new class extends Component
                     </div>
                 @endif
 
-                <div class="flex-1 overflow-y-auto flex flex-col-reverse">
+                <div
+                    class="flex-1 overflow-y-auto flex flex-col"
+                    x-data="{
+                        scrollToBottom() {
+                            this.$el.scrollTop = this.$el.scrollHeight;
+                        }
+                    }"
+                    x-init="
+                        scrollToBottom();
+                        Livewire.on('messageSent', () => { $nextTick(() => scrollToBottom()) });
+                        Livewire.on('channelSelected', () => { $nextTick(() => scrollToBottom()) });
+
+                        const observer = new MutationObserver(() => scrollToBottom());
+                        observer.observe($el, { childList: true, subtree: true });
+                    "
+                    @message-sent.window="$nextTick(() => scrollToBottom())"
+                    @channel-selected.window="$nextTick(() => scrollToBottom())"
+                >
+                    <div class="flex-1"></div>
                     <div>
                         <livewire:message-feed :channel="$activeChannel" wire:key="feed-{{ $activeChannel->id }}"/>
                     </div>

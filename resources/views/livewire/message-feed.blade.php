@@ -12,11 +12,16 @@ new class extends Component
     public function getListeners()
     {
         return [
-            "echo-private:workspace.{$this->channel->workspace_id}.channel.{$this->channel->id},.EchoChat\\Events\\MessageSent" => '$refresh',
+            "echo-private:workspace.{$this->channel->workspace_id}.channel.{$this->channel->id},.EchoChat\\Events\\MessageSent" => 'handleMessageSent',
             "echo-private:workspace.{$this->channel->workspace_id}.channel.{$this->channel->id},.EchoChat\\Events\\ReactionUpdated" => '$refresh',
-            'messageSent' => '$refresh',
+            'messageSent' => 'handleMessageSent',
             'searchMessages' => 'updateSearch',
         ];
+    }
+
+    public function handleMessageSent()
+    {
+        $this->dispatch('message-sent')->to('chat');
     }
 
     public function updateSearch(string $search)
