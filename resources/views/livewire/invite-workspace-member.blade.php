@@ -8,6 +8,7 @@ use Livewire\Volt\Component;
 new class extends Component {
     public Workspace $workspace;
     public array $selectedUserIds = [];
+    public string $search = '';
     public string $message = '';
 
     #[Computed]
@@ -17,7 +18,14 @@ new class extends Component {
         $memberIds = $this->workspace->members()->pluck('users.id')->toArray();
         $memberIds[] = $this->workspace->owner_id;
 
-        return User::whereNotIn('id', $memberIds)->get();
+        return User::whereNotIn('id', $memberIds)
+            ->when($this->search, function ($query) {
+                $query->where(function ($q) {
+                    $q->where('name', 'like', "%{$this->search}%")
+                        ->orWhere('email', 'like', "%{$this->search}%");
+                });
+            })
+            ->get();
     }
 
     public function invite()
@@ -50,6 +58,8 @@ new class extends Component {
     <h3 class="text-lg font-bold mb-4 dark:text-white">ワークスペースにメンバーを招待</h3>
     <form wire:submit.prevent="invite">
         <div class="space-y-4">
+            <flux:input wire:model.live.debounce.300ms="search" placeholder="ユーザー名またはメールアドレスで検索..." icon="magnifying-glass" />
+
             <div class="max-h-60 overflow-y-auto space-y-2">
                 @forelse($this->eligibleUsers as $user)
                     <label class="flex items-center gap-2 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 rounded cursor-pointer">
