@@ -22,9 +22,9 @@ class AIModelService
             return 'メッセージがありません。';
         }
 
-        $formattedMessages = $messages->map(fn ($m) => "{$m->user->name}: {$m->content}")->join("\n");
+        $formattedMessages = $messages->map(fn ($m) => "{$m->user->name}: ".trim(preg_replace('/\s+/', ' ', strip_tags(str_replace('<', ' <', $m->content)))))->join("\n");
 
-        $promptTemplate = config('echochat.ai.prompt', "以下のチャット履歴を簡潔に日本語で要約してください。\n\n:messages");
+        $promptTemplate = $channel->workspace->ai_prompt ?? config('echochat.ai.prompt', "以下のチャット履歴を簡潔に日本語で要約してください。\n\n:messages");
         $prompt = str_replace(':messages', $formattedMessages, $promptTemplate);
 
         return $this->callAI($prompt);

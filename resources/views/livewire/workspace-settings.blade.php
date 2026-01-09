@@ -9,6 +9,7 @@ new class extends Component {
     public string $name;
     public bool $allow_member_channel_creation;
     public bool $allow_member_channel_deletion;
+    public ?string $ai_prompt;
 
     public function mount(Workspace $workspace)
     {
@@ -18,6 +19,7 @@ new class extends Component {
         $this->name = $workspace->name;
         $this->allow_member_channel_creation = $workspace->allow_member_channel_creation;
         $this->allow_member_channel_deletion = $workspace->allow_member_channel_deletion;
+        $this->ai_prompt = $workspace->ai_prompt;
     }
 
     public function save()
@@ -26,12 +28,14 @@ new class extends Component {
 
         $this->validate([
             'name' => 'required|string|max:255',
+            'ai_prompt' => 'nullable|string',
         ]);
 
         $this->workspace->update([
             'name' => $this->name,
             'allow_member_channel_creation' => $this->allow_member_channel_creation,
             'allow_member_channel_deletion' => $this->allow_member_channel_deletion,
+            'ai_prompt' => $this->ai_prompt,
         ]);
 
         flux()->toast('設定を保存しました。');
@@ -65,6 +69,26 @@ new class extends Component {
                 <div class="mt-4">
                     <flux:switch wire:model="allow_member_channel_deletion" label="メンバーによるチャンネル削除を許可する" description="オフにするとオーナーと作成者のみが削除できます。" />
                 </div>
+            </div>
+
+            <flux:separator variant="subtle" />
+
+            <div>
+                <flux:heading level="3" class="mb-2">AI要約設定</flux:heading>
+                <flux:text class="mb-4">チャンネルのメッセージを要約する際のプロンプトをカスタマイズできます。</flux:text>
+
+                <flux:field>
+                    <flux:label>要約プロンプト</flux:label>
+                    <flux:textarea
+                        wire:model="ai_prompt"
+                        placeholder="以下のチャット履歴を簡潔に日本語で要約してください。&#10;&#10;:messages"
+                        rows="5"
+                    />
+                    <flux:description>
+                        <code>:messages</code> は実際のチャット履歴に置き換えられます。未入力の場合はデフォルトのプロンプトが使用されます。
+                    </flux:description>
+                    <flux:error name="ai_prompt" />
+                </flux:field>
             </div>
 
             <div class="flex">
