@@ -145,7 +145,7 @@ new class extends Component
                     </div>
                     <div class="flex items-center text-xs text-zinc-500 dark:text-zinc-400">
                         <flux:icon name="chat-bubble-left-right" variant="mini" class="mr-1" />
-                        {{ $workspace->channels()->count() }} チャンネル
+                        {{ $workspace->channels()->where('is_dm', false)->count() }} チャンネル
                     </div>
                 </div>
             </a>

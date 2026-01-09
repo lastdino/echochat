@@ -104,33 +104,64 @@ new class extends Component
     }
 }; ?>
 
-<div class="flex h-[calc(100vh-theme(spacing.16))] lg:h-screen bg-white dark:bg-zinc-900 overflow-hidden -m-6 lg:-m-8">
+<div
+    x-data="{ showSidebar: false }"
+    class="flex h-[calc(100vh-theme(spacing.16))] lg:h-screen bg-white dark:bg-zinc-900 overflow-hidden -m-6 lg:-m-8 relative"
+>
     <!-- Sidebar -->
-    <div class="w-64 flex-shrink-0 bg-zinc-100 dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700">
+    <div
+        :class="{ 'translate-x-0': showSidebar, '-translate-x-full': !showSidebar }"
+        class="fixed inset-y-0 left-0 z-40 w-64 bg-zinc-100 dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700 transition-transform duration-300 lg:relative lg:translate-x-0 lg:flex-shrink-0"
+    >
         <livewire:channel-list :workspace="$workspace" :activeChannel="$activeChannel" />
     </div>
+
+    <!-- Backdrop for mobile -->
+    <div
+        x-show="showSidebar"
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        @click="showSidebar = false"
+        x-cloak
+        class="fixed inset-0 z-30 bg-black/50 lg:hidden"
+    ></div>
+
     <!-- Main Chat Area -->
     <div class="flex-1 flex flex-col min-w-0">
         @if($activeChannel)
             <div class="flex-1 flex flex-col overflow-hidden">
                 <div class="p-4 border-b border-zinc-200 dark:border-zinc-700 flex justify-between items-center">
-                    <div class="flex flex-col min-w-0">
-                        <h2 class="text-lg font-bold dark:text-white flex items-center gap-2 group">
-                            <flux:icon :icon="$activeChannel->displayIcon" class="inline-block w-4 h-4"/>
-                            <span class="truncate">{{ $activeChannel->displayName }}</span>
+                    <div class="flex items-center gap-3 min-w-0">
+                        <!-- Sidebar toggle for mobile -->
+                        <button
+                            @click="showSidebar = true"
+                            class="lg:hidden p-1 -ml-1 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                        >
+                            <flux:icon icon="bars-3" variant="mini" />
+                        </button>
 
-                            @can('update', $activeChannel)
-                                <flux:modal.trigger name="edit-channel-modal">
-                                    <flux:button variant="subtle" size="sm" icon="pencil-square" square class="ml-1 opacity-0 group-hover:opacity-100 transition-opacity"/>
-                                </flux:modal.trigger>
-                            @endcan
-                        </h2>
+                        <div class="flex flex-col min-w-0">
+                            <h2 class="text-lg font-bold dark:text-white flex items-center gap-2 group">
+                                <flux:icon :icon="$activeChannel->displayIcon" class="inline-block w-4 h-4"/>
+                                <span class="truncate">{{ $activeChannel->displayName }}</span>
 
-                        @if($activeChannel->description)
-                            <p class="text-sm text-zinc-500 dark:text-zinc-400 truncate">
-                                {{ $activeChannel->description }}
-                            </p>
-                        @endif
+                                @can('update', $activeChannel)
+                                    <flux:modal.trigger name="edit-channel-modal">
+                                        <flux:button variant="subtle" size="sm" icon="pencil-square" square class="ml-1 opacity-0 group-hover:opacity-100 transition-opacity"/>
+                                    </flux:modal.trigger>
+                                @endcan
+                            </h2>
+
+                            @if($activeChannel->description)
+                                <p class="text-sm text-zinc-500 dark:text-zinc-400 truncate">
+                                    {{ $activeChannel->description }}
+                                </p>
+                            @endif
+                        </div>
                     </div>
 
                     @if(! $activeChannel->is_dm)

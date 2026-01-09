@@ -47,7 +47,8 @@ class Workspace extends Model
         }
 
         // キャッシュされたリレーションではなく、常にクエリを発行して最新の状態を取得する
-        $channels = $this->channels()->get();
+        // DMは未読カウントから除外する
+        $channels = $this->channels()->where('is_dm', false)->get();
         $totalUnread = 0;
 
         foreach ($channels as $channel) {

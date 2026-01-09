@@ -205,11 +205,25 @@ new class extends Component
     channelName: '',
     canDelete: false
 }">
-    <div class="p-4 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
-        <h1 class="font-bold text-xl dark:text-white truncate">{{ $workspace->name }}</h1>
-        @can('update', $workspace)
-            <flux:button variant="subtle" size="sm" icon="cog-6-tooth" square href="{{ route('echochat.workspaces.settings', ['workspace' => $workspace->slug]) }}" />
-        @endcan
+    <div class="p-4 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 min-w-0">
+            <a href="{{ route('echochat.workspaces') }}" class="lg:hidden text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200" wire:navigate>
+                <flux:icon icon="chevron-left" variant="mini" />
+            </a>
+            <h1 class="font-bold text-xl dark:text-white truncate">{{ $workspace->name }}</h1>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+            @can('update', $workspace)
+                <flux:button variant="subtle" size="sm" icon="cog-6-tooth" square href="{{ route('echochat.workspaces.settings', ['workspace' => $workspace->slug]) }}" />
+            @endcan
+
+            <button
+                @click="showSidebar = false"
+                class="lg:hidden p-1 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+            >
+                <flux:icon icon="x-mark" variant="mini" />
+            </button>
+        </div>
     </div>
 
     <div class="flex-1 overflow-y-auto p-2">
