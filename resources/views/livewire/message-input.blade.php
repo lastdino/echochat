@@ -122,10 +122,47 @@ new class extends Component
 
         <div class="flex items-center justify-between p-2">
             <div class="flex items-center gap-2">
-                <label class="cursor-pointer p-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">
-                    <input type="file" wire:model="attachments" multiple class="hidden" />
-                    <flux:icon icon="paper-clip" class="w-5 h-5" />
-                </label>
+                <flux:modal.trigger name="file-upload-modal">
+                    <flux:button type="button" variant="subtle" icon="paper-clip" square class="p-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300" />
+                </flux:modal.trigger>
+
+                <flux:modal name="file-upload-modal" class="md:w-[400px]">
+                    <div class="space-y-6">
+                        <div>
+                            <flux:heading size="lg">ファイルを添付</flux:heading>
+                            <flux:subheading>送信するファイルを選択してください。</flux:subheading>
+                        </div>
+
+                        <div
+                            x-data="{ isDragging: false }"
+                            @dragover.prevent="isDragging = true"
+                            @dragleave.prevent="isDragging = false"
+                            @drop.prevent="isDragging = false; $refs.fileInput.files = $event.dataTransfer.files; $refs.fileInput.dispatchEvent(new Event('change'))"
+                            :class="isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-zinc-300 dark:border-zinc-700'"
+                            class="relative border-2 border-dashed rounded-xl p-8 transition-colors"
+                        >
+                            <input
+                                type="file"
+                                wire:model="attachments"
+                                multiple
+                                class="absolute inset-0 opacity-0 cursor-pointer"
+                                x-ref="fileInput"
+                                @change="Flux.modal('file-upload-modal').close()"
+                            />
+
+                            <div class="flex flex-col items-center justify-center gap-2 text-zinc-500">
+                                <flux:icon icon="arrow-up-tray" class="w-8 h-8" />
+                                <div class="text-sm font-medium">クリックまたはドラッグ＆ドロップでアップロード</div>
+                                <div class="text-xs">最大 10MB</div>
+                            </div>
+                        </div>
+
+                        <div class="flex">
+                            <flux:spacer />
+                            <flux:button x-on:click="Flux.modal('file-upload-modal').close()">キャンセル</flux:button>
+                        </div>
+                    </div>
+                </flux:modal>
 
                 <flux:dropdown>
                     <flux:button type="button" variant="subtle" icon="face-smile" icon:variant="outline" square class="p-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300" />
