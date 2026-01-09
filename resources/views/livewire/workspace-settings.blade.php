@@ -3,6 +3,7 @@
 use EchoChat\Models\Workspace;
 use Livewire\Volt\Component;
 use Illuminate\Support\Facades\Gate;
+use Flux\Flux;
 
 new class extends Component {
     public Workspace $workspace;
@@ -38,7 +39,7 @@ new class extends Component {
             'ai_prompt' => $this->ai_prompt,
         ]);
 
-        flux()->toast('設定を保存しました。');
+        Flux::toast('設定を保存しました。');
     }
 }; ?>
 
