@@ -16,6 +16,7 @@ new class extends Component
 
     protected $listeners = [
         'channelCreated' => '$refresh',
+        'channelUpdated' => '$refresh',
         'workspaceMemberAdded' => '$refresh',
     ];
 
@@ -52,6 +53,7 @@ new class extends Component
         return [
             "echo-private:workspace.{$this->workspace->id},.EchoChat\\Events\\MessageSent" => 'handleIncomingMessage',
             'channelCreated' => '$refresh',
+            'channelUpdated' => '$refresh',
             'workspaceMemberAdded' => '$refresh',
         ];
     }
