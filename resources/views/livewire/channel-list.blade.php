@@ -196,7 +196,7 @@ new class extends Component
     }
 }; ?>
 
-<div class="flex flex-col h-full" x-data="{
+<div class="flex flex-col h-full relative" x-ref="sidebar" x-data="{
     open: false,
     x: 0,
     y: 0,
@@ -244,7 +244,7 @@ new class extends Component
                         <div class="group/channel relative">
                             <x-echochat::nav-item-with-badge
                                 wire:click="selectChannel({{ $channel->id }})"
-                                @contextmenu.prevent="open = true; x = $event.clientX; y = $event.clientY; type = 'channel'; channelId = {{ $channel->id }}; channelName = '{{ $channel->name }}'; canDelete = {{ Gate::check('delete', $channel) ? 'true' : 'false' }}"
+                                @contextmenu.prevent="let rect = $refs.sidebar.getBoundingClientRect(); open = true; x = $event.clientX - rect.left; y = $event.clientY - rect.top; type = 'channel'; channelId = {{ $channel->id }}; channelName = '{{ $channel->name }}'; canDelete = {{ Gate::check('delete', $channel) ? 'true' : 'false' }}"
                                 :current="$activeChannel && $activeChannel->id === $channel->id"
                                 :badge="$notifications[$channel->id] ?? 0"
                                 badge-color="blue"
@@ -318,7 +318,7 @@ new class extends Component
                             <x-echochat::nav-item-with-badge
                                 wire:key="member-{{ $member->id }}"
                                 wire:click="openDirectMessage({{ $member->id }})"
-                                @contextmenu.prevent="open = true; x = $event.clientX; y = $event.clientY; type = 'member'; memberId = {{ $member->id }}; memberName = '{{ $memberName }}'"
+                                @contextmenu.prevent="let rect = $refs.sidebar.getBoundingClientRect(); open = true; x = $event.clientX - rect.left; y = $event.clientY - rect.top; type = 'member'; memberId = {{ $member->id }}; memberName = '{{ $memberName }}'"
                                 :current="$activeChannel && $memberDmChannel && $activeChannel->id === $memberDmChannel->id"
                                 :badge="($memberDmChannel && ($notifications[$memberDmChannel->id] ?? 0) > 0) ? $notifications[$memberDmChannel->id] : null"
                                 badge-color="blue"
@@ -373,7 +373,7 @@ new class extends Component
         x-cloak
         @click.away="open = false"
         @keydown.escape.window="open = false"
-        x-bind:style="`position: fixed; left: ${x}px; top: ${y}px; z-index: 50;`"
+        x-bind:style="`position: absolute; left: ${x}px; top: ${y}px; z-index: 50;`"
         class="min-w-48 p-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-md"
     >
         <template x-if="type === 'member'">
