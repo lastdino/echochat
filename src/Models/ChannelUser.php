@@ -14,7 +14,7 @@ class ChannelUser extends Model
         return Tables::name('channel_user');
     }
 
-    protected $fillable = ['channel_id', 'user_id', 'last_read_at'];
+    protected $fillable = ['channel_id', 'user_id', 'last_read_at', 'sort_order'];
 
     protected $casts = [
         'last_read_at' => 'datetime',

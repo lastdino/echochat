@@ -16,7 +16,7 @@ class Channel extends Model
         return Tables::name('channels');
     }
 
-    protected $fillable = ['workspace_id', 'name', 'description', 'is_private', 'is_dm', 'creator_id'];
+    protected $fillable = ['workspace_id', 'name', 'description', 'is_private', 'is_dm', 'creator_id', 'sort_order'];
 
     protected function casts(): array
     {

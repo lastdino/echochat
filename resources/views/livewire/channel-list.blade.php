@@ -1,5 +1,6 @@
 <?php
 
+use EchoChat\Support\Tables;
 use EchoChat\Models\Channel;
 use EchoChat\Models\ChannelUser;
 use EchoChat\Models\Message;
@@ -194,6 +195,20 @@ new class extends Component
 
         $this->dispatch('channelCreated'); // リスト再描画のために使用
     }
+
+    public function updateOrder(array $items)
+    {
+        $userId = auth()->id();
+
+        foreach ($items as $item) {
+            ChannelUser::updateOrCreate(
+                ['channel_id' => $item['value'], 'user_id' => $userId],
+                ['sort_order' => $item['order']]
+            );
+        }
+
+        $this->dispatch('channelUpdated');
+    }
 }; ?>
 
 <div class="flex flex-col h-full relative" x-ref="sidebar" x-data="{
@@ -230,7 +245,23 @@ new class extends Component
 
     <div class="flex-1 overflow-y-auto p-2">
         <flux:navlist>
-            <flux:navlist.group heading="チャンネル" expandable>
+            @php
+                $channels = $workspace->channels()
+                    ->where('is_dm', false)
+                    ->leftJoin(Tables::name('channel_user'), function ($join) {
+                        $join->on(Tables::name('channels').'.id', '=', Tables::name('channel_user').'.channel_id')
+                            ->where(Tables::name('channel_user').'.user_id', '=', auth()->id());
+                    })
+                    ->select(Tables::name('channels').'.*', Tables::name('channel_user').'.sort_order as user_sort_order')
+                    ->orderByRaw('COALESCE('.Tables::name('channel_user').'.sort_order, '.Tables::name('channels').'.id) ASC')
+                    ->get()
+                    ->filter(fn($channel) => $channel->canView(auth()->id()));
+
+                $publicChannels = $channels->where('is_private', false);
+                $privateChannels = $channels->where('is_private', true);
+            @endphp
+
+            <flux:navlist.group heading="パブリックチャンネル" expandable>
                 @can('createChannel', $workspace)
                     <x-slot name="actions">
                         <flux:modal.trigger name="create-channel-modal">
@@ -239,9 +270,9 @@ new class extends Component
                     </x-slot>
                 @endcan
 
-                @foreach($workspace->channels()->where('is_dm', false)->get() as $channel)
-                    @if($channel->canView(auth()->id()))
-                        <div class="group/channel relative">
+                <div x-sort>
+                    @foreach($publicChannels as $channel)
+                        <div class="group/channel relative" x-sort:item="{{ $channel->id }}">
                             <x-echochat::nav-item-with-badge
                                 wire:click="selectChannel({{ $channel->id }})"
                                 @contextmenu.prevent="let rect = $refs.sidebar.getBoundingClientRect(); open = true; x = $event.clientX - rect.left; y = $event.clientY - rect.top; type = 'channel'; channelId = {{ $channel->id }}; channelName = '{{ $channel->name }}'; canDelete = {{ Gate::check('delete', $channel) ? 'true' : 'false' }}"
@@ -253,8 +284,8 @@ new class extends Component
                                 {{ $channel->displayName }}
                             </x-echochat::nav-item-with-badge>
                         </div>
-                    @endif
-                @endforeach
+                    @endforeach
+                </div>
 
                 @can('createChannel', $workspace)
                     <flux:modal.trigger name="create-channel-modal">
@@ -263,6 +294,25 @@ new class extends Component
                         </flux:navlist.item>
                     </flux:modal.trigger>
                 @endcan
+            </flux:navlist.group>
+
+            <flux:navlist.group heading="プライベートチャンネル" expandable class="mt-4">
+                <div x-sort>
+                    @foreach($privateChannels as $channel)
+                        <div class="group/channel relative" x-sort:item="{{ $channel->id }}">
+                            <x-echochat::nav-item-with-badge
+                                wire:click="selectChannel({{ $channel->id }})"
+                                @contextmenu.prevent="let rect = $refs.sidebar.getBoundingClientRect(); open = true; x = $event.clientX - rect.left; y = $event.clientY - rect.top; type = 'channel'; channelId = {{ $channel->id }}; channelName = '{{ $channel->name }}'; canDelete = {{ Gate::check('delete', $channel) ? 'true' : 'false' }}"
+                                :current="$activeChannel && $activeChannel->id === $channel->id"
+                                :badge="$notifications[$channel->id] ?? 0"
+                                badge-color="blue"
+                                :icon="$channel->displayIcon"
+                            >
+                                {{ $channel->displayName }}
+                            </x-echochat::nav-item-with-badge>
+                        </div>
+                    @endforeach
+                </div>
             </flux:navlist.group>
 
             <flux:navlist.group heading="ダイレクトメッセージ" expandable class="mt-4">
