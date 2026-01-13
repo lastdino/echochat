@@ -62,7 +62,7 @@ new class extends Component {
 
             <div class="max-h-60 overflow-y-auto space-y-2">
                 @forelse($this->eligibleUsers as $user)
-                    <label class="flex items-center gap-2 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 rounded cursor-pointer">
+                    <label wire:key="user-{{ $user->id }}" class="flex items-center gap-2 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 rounded cursor-pointer">
                         <flux:checkbox wire:model.live="selectedUserIds" value="{{ $user->id }}" />
                         <div class="flex flex-col">
                             <span class="text-sm font-medium dark:text-white">{{ \EchoChat\Support\UserSupport::getName($user) }}</span>
