@@ -63,7 +63,7 @@ return [
     | to enable Pro components like flux:composer and flux:editor.
     |
     */
-    'flux_pro' => env('ECHOCHAT_FLUX_PRO', true),
+    'flux_pro' => env('ECHOCHAT_FLUX_PRO', false),
 
     /*
     |--------------------------------------------------------------------------

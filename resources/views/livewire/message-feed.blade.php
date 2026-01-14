@@ -64,7 +64,7 @@ new class extends Component
 
     public function replyTo(int $messageId)
     {
-        $this->dispatch('setReplyTo', messageId: $messageId)->to('message-input');
+        $this->dispatch('setReplyTo', messageId: $messageId);
     }
 
     public function deleteAttachment(int $messageId, int $mediaId)

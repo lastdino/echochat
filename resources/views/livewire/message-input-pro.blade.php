@@ -325,7 +325,7 @@ new class extends Component
                 <div class="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 overflow-hidden">
                     <flux:icon icon="arrow-uturn-left" class="w-3 h-3 flex-shrink-0" />
                     <span class="font-bold flex-shrink-0">{{ $replyToMessage->user->name }}</span>
-                    <span class="truncate">{{ $replyToMessage->content }}</span>
+                    <span class="truncate">{{ strip_tags($replyToMessage->content) }}</span>
                 </div>
                 <button type="button" wire:click="cancelReply" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
                     <flux:icon icon="x-mark" class="w-4 h-4" />
