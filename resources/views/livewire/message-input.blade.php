@@ -1,5 +1,6 @@
 <?php
 
+use App\Notifications\MentionedInMessage;
 use EchoChat\Events\MessageSent;
 use EchoChat\Models\Channel;
 use EchoChat\Models\ChannelUser;
@@ -21,6 +22,12 @@ new class extends Component
 
     public ?Message $replyToMessage = null;
 
+    public $mentionSearch = '';
+
+    public $mentionResults = [];
+
+    public int $mentionIndex = 0;
+
     protected $listeners = [
         'setReplyTo' => 'setReplyTo',
     ];
@@ -35,6 +42,115 @@ new class extends Component
     {
         $this->replyToId = null;
         $this->replyToMessage = null;
+    }
+
+    public function updatedMentionSearch()
+    {
+        $this->loadMentions();
+    }
+
+    public function loadMentions()
+    {
+        $members = [];
+        if (empty($this->mentionSearch)) {
+            $members = $this->channel->members()
+                ->with('user')
+                ->take(10)
+                ->get()
+                ->map(fn ($m) => [
+                    'id' => $m->user_id,
+                    'name' => \EchoChat\Support\UserSupport::getName($m->user),
+                ])
+                ->toArray();
+        } else {
+            $searchTerm = '%'.$this->mentionSearch.'%';
+            $members = $this->channel->members()
+                ->whereHas('user', function ($query) use ($searchTerm) {
+                    $query->where('name', 'like', $searchTerm);
+                })
+                ->with('user')
+                ->take(10)
+                ->get()
+                ->map(fn ($m) => [
+                    'id' => $m->user_id,
+                    'name' => \EchoChat\Support\UserSupport::getName($m->user),
+                ])
+                ->toArray();
+        }
+
+        // Add "channel" to results if it matches
+        if (empty($this->mentionSearch) || str_contains('channel', strtolower($this->mentionSearch))) {
+            array_unshift($members, [
+                'id' => 'channel',
+                'name' => 'channel',
+            ]);
+        }
+
+        $this->mentionResults = $members;
+        $this->mentionIndex = 0;
+    }
+
+    protected function notifyMentions(Message $message)
+    {
+        if (empty($message->content)) {
+            return;
+        }
+
+        $content = $message->content;
+
+        // Check for @channel
+        $hasChannelMention = str_contains($content, '@channel');
+        if ($hasChannelMention) {
+            $content = str_replace('@channel', '___MENTION_DONE___', $content);
+            $membersToNotify = $this->channel->members()
+                ->where('user_id', '!=', auth()->id())
+                ->with('user')
+                ->get()
+                ->map(fn ($m) => $m->user);
+
+            foreach ($membersToNotify as $user) {
+                $user->notify(new MentionedInMessage($message, true));
+            }
+        }
+
+        // チャンネルメンバーの名前リストを取得（長い順にソートして部分一致を防ぐ）
+        $members = $this->channel->members()
+            ->with('user')
+            ->get()
+            ->map(fn ($m) => [
+                'user' => $m->user,
+                'name' => \EchoChat\Support\UserSupport::getName($m->user),
+            ])
+            ->filter(fn ($m) => ! empty($m['name']))
+            ->sortByDesc(fn ($m) => strlen($m['name']));
+
+        $mentionedUserIds = [];
+
+        foreach ($members as $member) {
+            $name = $member['name'];
+            $mention = '@'.$name;
+
+            // メッセージ内に @名前 が含まれているか確認（単語境界を考慮）
+            // 名前の中にスペースが含まれる可能性があるため、単純な \b は使えない場合がある
+            // ここでは文字列置換の要領でチェック
+            if (str_contains($content, $mention)) {
+                if ($member['user']->id !== auth()->id()) {
+                    $mentionedUserIds[] = $member['user']->id;
+                    // 他の名前と部分一致しないように、マッチした部分を置換して除外する
+                    $content = str_replace($mention, '___MENTION_DONE___', $content);
+                }
+            }
+        }
+
+        if (empty($mentionedUserIds)) {
+            return;
+        }
+
+        $mentionedUsers = \App\Models\User::whereIn('id', array_unique($mentionedUserIds))->get();
+
+        foreach ($mentionedUsers as $user) {
+            $user->notify(new MentionedInMessage($message));
+        }
     }
 
     public function sendMessage()
@@ -64,6 +180,9 @@ new class extends Component
         broadcast(new MessageSent($message->load('media')))->toOthers();
         broadcast(new \EchoChat\Events\ChannelRead($this->channel, auth()->id()))->toOthers();
 
+        // メンション通知の送信
+        $this->notifyMentions($message);
+
         $this->content = '';
         $this->attachments = [];
         $this->replyToId = null;
@@ -78,8 +197,116 @@ new class extends Component
     }
 }; ?>
 
-<form wire:submit.prevent="sendMessage">
+<form wire:submit.prevent="sendMessage"
+    x-data="{
+        showMentions: false,
+        mentionSearch: @entangle('mentionSearch'),
+        mentionResults: @entangle('mentionResults'),
+        mentionIndex: @entangle('mentionIndex'),
+        cursorPos: 0,
+        mentionStart: 0,
+        handleKeydown(e) {
+            if (this.showMentions) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.mentionIndex = (this.mentionIndex + 1) % this.mentionResults.length;
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.mentionIndex = (this.mentionIndex - 1 + this.mentionResults.length) % this.mentionResults.length;
+                } else if (e.key === 'Enter' || e.key === 'Tab') {
+                    e.preventDefault();
+                    this.selectMention(this.mentionResults[this.mentionIndex]);
+                } else if (e.key === 'Escape') {
+                    this.showMentions = false;
+                }
+            }
+        },
+        handleInput(e) {
+            const textarea = e.target;
+            const text = textarea.value;
+            const pos = textarea.selectionStart;
+            this.cursorPos = pos;
+
+            const lastAt = text.lastIndexOf('@', pos - 1);
+            if (lastAt !== -1 && (lastAt === 0 || /\s/.test(text[lastAt - 1]))) {
+                const query = text.substring(lastAt + 1, pos);
+                if (!/\s/.test(query)) {
+                    this.showMentions = true;
+                    this.mentionStart = lastAt;
+                    this.mentionSearch = query;
+                    // queryが空の場合は明示的に更新をトリガーする
+                    if (query === '') {
+                        $wire.loadMentions();
+                    }
+                    return;
+                }
+            }
+            this.showMentions = false;
+        },
+        triggerMention() {
+            const textarea = this.$refs.textarea;
+            const text = textarea.value;
+            const pos = textarea.selectionStart;
+
+            // 現在のカーソル位置に @ を挿入
+            const before = text.substring(0, pos);
+            const after = text.substring(pos);
+            const newContent = before + '@' + after;
+
+            $wire.set('content', newContent);
+
+            this.$nextTick(() => {
+                const newPos = pos + 1;
+                textarea.focus();
+                textarea.setSelectionRange(newPos, newPos);
+
+                // inputイベントを擬似的に発生させてメンションリストを表示させる
+                this.handleInput({ target: textarea });
+            });
+        },
+        selectMention(member) {
+            const textarea = this.$refs.textarea;
+            const text = textarea.value;
+            const before = text.substring(0, this.mentionStart);
+            const after = text.substring(this.cursorPos);
+            const newContent = before + '@' + member.name + ' ' + after;
+
+            $wire.set('content', newContent);
+            this.showMentions = false;
+
+            this.$nextTick(() => {
+                const newPos = before.length + member.name.length + 2;
+                textarea.focus();
+                textarea.setSelectionRange(newPos, newPos);
+            });
+        }
+    }"
+>
     <div class="relative bg-white dark:bg-zinc-800 rounded-lg border border-zinc-300 dark:border-zinc-700">
+        @if($mentionResults && count($mentionResults) > 0)
+            <div
+                x-show="showMentions"
+                x-cloak
+                class="absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden"
+                @click.away="showMentions = false"
+            >
+                <div class="p-2 text-xs font-bold text-zinc-500 border-b border-zinc-100 dark:border-zinc-700">メンバーをメンション</div>
+                <div class="max-h-48 overflow-y-auto">
+                    <template x-for="(member, index) in mentionResults" :key="member.id">
+                        <button
+                            type="button"
+                            @click="selectMention(member)"
+                            @mouseenter="mentionIndex = index"
+                            :class="mentionIndex === index ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300' : 'text-zinc-700 dark:text-zinc-300'"
+                            class="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
+                        >
+                            <span class="font-medium" x-text="member.name"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+        @endif
+
         @if($replyToMessage)
             <div class="flex items-center justify-between p-2 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-700 rounded-t-lg">
                 <div class="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 overflow-hidden">
@@ -114,7 +341,10 @@ new class extends Component
         @endif
 
         <textarea
+            x-ref="textarea"
             wire:model="content"
+            @input="handleInput"
+            @keydown="handleKeydown"
             placeholder="# {{ $channel->name }} へのメッセージ"
             class="w-full bg-transparent border-none focus:ring-0 focus:outline-none dark:text-white resize-none p-3"
             rows="3"
@@ -122,6 +352,10 @@ new class extends Component
 
         <div class="flex items-center justify-between p-2">
             <div class="flex items-center gap-2">
+                <button type="button" @click="triggerMention" class="p-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 rounded hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors" title="メンションを追加">
+                    <span class="text-lg font-bold">@</span>
+                </button>
+
                 <flux:modal.trigger name="file-upload-modal">
                     <flux:button type="button" variant="subtle" icon="paper-clip" square class="p-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300" />
                 </flux:modal.trigger>

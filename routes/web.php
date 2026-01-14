@@ -41,6 +41,6 @@ Route::middleware(['web', 'auth'])->group(function () {
     Volt::route($path.'/{workspace:slug}/settings', 'workspace-settings')
         ->name('echochat.workspaces.settings');
 
-    Volt::route($path.'/{workspace:slug}/{channel?}', 'chat')
+    Volt::route($path.'/{workspace:slug}/{channel?}/{message?}', 'chat')
         ->name('echochat.chat');
 });

@@ -2,6 +2,7 @@
 
 namespace EchoChat\Traits;
 
+use EchoChat\Models\ChannelUser;
 use EchoChat\Models\Workspace;
 use EchoChat\Support\Tables;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -10,6 +11,14 @@ use Illuminate\Support\Collection;
 
 trait InteractsWithWorkspaces
 {
+    /**
+     * Get the channel user records for the user.
+     */
+    public function channelUsers(): HasMany
+    {
+        return $this->hasMany(ChannelUser::class, 'user_id');
+    }
+
     /**
      * Get the workspaces owned by the user.
      */
@@ -25,6 +34,16 @@ trait InteractsWithWorkspaces
     {
         return $this->belongsToMany(Workspace::class, Tables::name('workspace_members'))
             ->withTimestamps();
+    }
+
+    /**
+     * Initialize the trait.
+     */
+    public function initializeInteractsWithWorkspaces(): void
+    {
+        $this->mergeCasts([
+            'echochat_settings' => 'array',
+        ]);
     }
 
     /**

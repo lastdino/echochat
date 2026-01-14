@@ -19,7 +19,13 @@ new class extends Component
         'channelCreated' => '$refresh',
         'channelUpdated' => '$refresh',
         'workspaceMemberAdded' => '$refresh',
+        'channelSelected' => 'handleChannelSelected',
     ];
+
+    public function handleChannelSelected($channelId)
+    {
+        $this->activeChannel = Channel::find($channelId);
+    }
 
     public function mount()
     {
@@ -56,6 +62,7 @@ new class extends Component
             'channelCreated' => '$refresh',
             'channelUpdated' => '$refresh',
             'workspaceMemberAdded' => '$refresh',
+            'channelSelected' => 'handleChannelSelected',
         ];
     }
 
