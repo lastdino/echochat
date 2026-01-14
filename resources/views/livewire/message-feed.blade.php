@@ -111,11 +111,24 @@ new class extends Component
 
     public function formatContent(string $content): string
     {
-        // まずはエスケープしてXSSを防ぐ
-        $escaped = e($content);
+        // HTMLタグが含まれているかチェック
+        if ($content === strip_tags($content)) {
+            // タグが含まれていない場合は通常通りエスケープと改行処理
+            $escaped = e($content);
+            $withBreaks = nl2br($escaped);
+        } else {
+            // HTMLタグが含まれている場合は、許可されたタグ以外を除去（XSS対策）
+            // 許可するタグ: <b>, <i>, <u>, <s>, <a>, <ul>, <ol>, <li>, <code>, <pre>, <br>, <p>, <h1>, <h2>, <h3>
+            $allowedTags = '<b><i><u><s><a><ul><ol><li><code><pre><br><p><h1><h2><h3>';
+            $sanitized = strip_tags($content, $allowedTags);
 
-        // 改行を <br> に変換
-        $withBreaks = nl2br($escaped);
+            // 属性の除去（javascript: 等の除去のため、簡易的な処理）
+            // より厳格な対策が必要な場合は HTML Purifier などの導入を推奨
+            $sanitized = preg_replace('/on\w+="[^"]*"/i', '', $sanitized);
+            $sanitized = preg_replace('/href="javascript:[^"]*"/i', 'href="#"', $sanitized);
+
+            $withBreaks = $sanitized;
+        }
 
         // @channel のハイライト
         $replacements = [];

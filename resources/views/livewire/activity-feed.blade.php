@@ -69,7 +69,7 @@ new class extends Component
 
         // 1. メンション（通知から取得するのが確実）
         $mentionsQuery = auth()->user()->notifications()
-            ->where('type', \App\Notifications\MentionedInMessage::class)
+            ->where('type', \EchoChat\Notifications\MentionedInMessage::class)
             ->latest();
 
         $mentions = $mentionsQuery->get()

@@ -117,6 +117,7 @@ new class extends Component
 
         if ($this->channel === $channelId && $this->message === '') {
             $this->dispatch('channelSelected', channelId: $channelId);
+
             return;
         }
 
@@ -436,7 +437,11 @@ new class extends Component
 
                 <div class="p-4">
                     @if($activeChannel->isMember(auth()->id()))
-                        <livewire:message-input :channel="$activeChannel" wire:key="input-{{ $activeChannel->id }}"/>
+                        @if(config('echochat.flux_pro'))
+                            <livewire:message-input-pro :channel="$activeChannel" wire:key="input-pro-{{ $activeChannel->id }}"/>
+                        @else
+                            <livewire:message-input :channel="$activeChannel" wire:key="input-{{ $activeChannel->id }}"/>
+                        @endif
                     @elseif($activeChannel->canJoin(auth()->id()))
                         <div
                             wire:key="join-{{ $activeChannel->id }}"

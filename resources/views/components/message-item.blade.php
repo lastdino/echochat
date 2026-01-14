@@ -78,9 +78,22 @@
 
             <flux:dropdown>
                 <flux:button variant="ghost" size="sm" icon="ellipsis-horizontal" class="opacity-0 group-hover/message:opacity-100 transition-opacity" />
-                <flux:menu>
+                <flux:menu x-data="{
+                    copy(content) {
+                        if (! navigator.clipboard) {
+                            const el = document.createElement('textarea');
+                            el.value = content;
+                            document.body.appendChild(el);
+                            el.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(el);
+                            return;
+                        }
+                        navigator.clipboard.writeText(content);
+                    }
+                }">
                     <flux:menu.item icon="arrow-uturn-left" wire:click="replyTo({{ $message->id }})">返信</flux:menu.item>
-                    <flux:menu.item icon="document-duplicate" @click="navigator.clipboard.writeText({{ Js::from($message->content) }})">コピー</flux:menu.item>
+                    <flux:menu.item icon="document-duplicate" @click="copy({{ Js::from($message->content) }})">コピー</flux:menu.item>
                 </flux:menu>
             </flux:dropdown>
         </div>
