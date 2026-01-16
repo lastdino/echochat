@@ -285,32 +285,30 @@ new class extends Component
     }"
 >
     <div class="relative bg-white dark:bg-zinc-800 rounded-lg border border-zinc-300 dark:border-zinc-700">
-        @if($mentionResults && count($mentionResults) > 0)
-            <div
-                x-show="showMentions"
-                x-cloak
-                class="absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden"
-                @click.away="showMentions = false"
-            >
-                <div class="p-2 text-xs font-bold text-zinc-500 border-b border-zinc-100 dark:border-zinc-700">メンバーをメンション</div>
-                <div class="max-h-48 overflow-y-auto" x-show="mentionResults && mentionResults.length > 0">
-                    <template x-for="(member, index) in mentionResults" :key="member.id">
-                        <button
-                            type="button"
-                            @click="selectMention(member)"
-                            @mouseenter="mentionIndex = index"
-                            :class="mentionIndex === index ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300' : 'text-zinc-700 dark:text-zinc-300'"
-                            class="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
-                        >
-                            <span class="font-medium" x-text="member.name"></span>
-                        </button>
-                    </template>
-                </div>
-                <div class="p-3 text-sm text-zinc-500 text-center" x-show="!mentionResults || mentionResults.length === 0">
-                    メンバーが見つかりません
-                </div>
+        <div
+            x-show="showMentions"
+            x-cloak
+            class="absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden"
+            @click.away="showMentions = false"
+        >
+            <div class="p-2 text-xs font-bold text-zinc-500 border-b border-zinc-100 dark:border-zinc-700">メンバーをメンション</div>
+            <div class="max-h-48 overflow-y-auto" x-show="mentionResults && mentionResults.length > 0">
+                <template x-for="(member, index) in mentionResults" :key="member.id">
+                    <button
+                        type="button"
+                        @click="selectMention(member)"
+                        @mouseenter="mentionIndex = index"
+                        :class="mentionIndex === index ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300' : 'text-zinc-700 dark:text-zinc-300'"
+                        class="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
+                    >
+                        <span class="font-medium" x-text="member.name"></span>
+                    </button>
+                </template>
             </div>
-        @endif
+            <div class="p-3 text-sm text-zinc-500 text-center" x-show="!mentionResults || mentionResults.length === 0">
+                メンバーが見つかりません
+            </div>
+        </div>
 
         @if($replyToMessage)
             <div class="flex items-center justify-between p-2 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-700 rounded-t-lg">
