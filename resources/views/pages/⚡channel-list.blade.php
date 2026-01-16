@@ -1,11 +1,11 @@
 <?php
 
-use EchoChat\Support\Tables;
 use EchoChat\Models\Channel;
 use EchoChat\Models\ChannelUser;
 use EchoChat\Models\Message;
 use EchoChat\Models\Workspace;
-use Livewire\Volt\Component;
+use EchoChat\Support\Tables;
+use Livewire\Component;
 
 new class extends Component
 {
@@ -68,6 +68,10 @@ new class extends Component
 
     public function handleIncomingMessage($event)
     {
+        if (! is_array($event) || ! isset($event['channel_id'])) {
+            return;
+        }
+
         $channelId = $event['channel_id'];
 
         if ($this->activeChannel && $this->activeChannel->id === $channelId) {
@@ -126,7 +130,7 @@ new class extends Component
         $this->updateLastRead($channelId);
         $this->notifications[$channelId] = 0;
         $this->activeChannel = Channel::find($channelId);
-        $this->dispatch('channelSelected', $channelId)->to('chat');
+        $this->dispatch('channelSelected', $channelId)->to('echochat::chat');
     }
 
     protected function updateLastRead($channelId)
@@ -197,7 +201,7 @@ new class extends Component
 
         if ($this->activeChannel && $this->activeChannel->id === (int) $channelId) {
             $this->activeChannel = null;
-            $this->dispatch('channelSelected', null)->to('chat');
+            $this->dispatch('channelSelected', null)->to('echochat::chat');
         }
 
         $this->dispatch('channelCreated'); // リスト再描画のために使用
@@ -208,6 +212,10 @@ new class extends Component
         $userId = auth()->id();
 
         foreach ($items as $item) {
+            if (! is_array($item) || ! isset($item['value']) || ! isset($item['order'])) {
+                continue;
+            }
+
             ChannelUser::updateOrCreate(
                 ['channel_id' => $item['value'], 'user_id' => $userId],
                 ['sort_order' => $item['order']]
@@ -277,14 +285,14 @@ new class extends Component
                     </x-slot>
                 @endcan
 
-                <div x-sort>
+                <div >
                     @foreach($publicChannels as $channel)
-                        <div class="group/channel relative" x-sort:item="{{ $channel->id }}">
+                        <div class="group/channel relative" >
                             <x-echochat::nav-item-with-badge
                                 wire:click="selectChannel({{ $channel->id }})"
                                 @contextmenu.prevent="let rect = $refs.sidebar.getBoundingClientRect(); open = true; x = $event.clientX - rect.left; y = $event.clientY - rect.top; type = 'channel'; channelId = {{ $channel->id }}; channelName = '{{ $channel->name }}'; canDelete = {{ Gate::check('delete', $channel) ? 'true' : 'false' }}"
                                 :current="$activeChannel && $activeChannel->id === $channel->id"
-                                :badge="$notifications[$channel->id] ?? 0"
+                                :badge="isset($notifications[$channel->id]) ? $notifications[$channel->id] : 0"
                                 badge-color="blue"
                                 :icon="$channel->displayIcon"
                             >
@@ -304,14 +312,14 @@ new class extends Component
             </flux:navlist.group>
 
             <flux:navlist.group heading="プライベートチャンネル" expandable class="mt-4">
-                <div x-sort>
+                <div >
                     @foreach($privateChannels as $channel)
-                        <div class="group/channel relative" x-sort:item="{{ $channel->id }}">
+                        <div class="group/channel relative" >
                             <x-echochat::nav-item-with-badge
                                 wire:click="selectChannel({{ $channel->id }})"
                                 @contextmenu.prevent="let rect = $refs.sidebar.getBoundingClientRect(); open = true; x = $event.clientX - rect.left; y = $event.clientY - rect.top; type = 'channel'; channelId = {{ $channel->id }}; channelName = '{{ $channel->name }}'; canDelete = {{ Gate::check('delete', $channel) ? 'true' : 'false' }}"
                                 :current="$activeChannel && $activeChannel->id === $channel->id"
-                                :badge="$notifications[$channel->id] ?? 0"
+                                :badge="isset($notifications[$channel->id]) ? $notifications[$channel->id] : 0"
                                 badge-color="blue"
                                 :icon="$channel->displayIcon"
                             >
@@ -340,7 +348,7 @@ new class extends Component
                     wire:key="member-owner-{{ $workspace->owner->id }}"
                     wire:click="openDirectMessage({{ $workspace->owner->id }})"
                     :current="$activeChannel && $ownerDmChannel && $activeChannel->id === $ownerDmChannel->id"
-                    :badge="($ownerDmChannel && ($notifications[$ownerDmChannel->id] ?? 0) > 0) ? $notifications[$ownerDmChannel->id] : null"
+                    :badge="$ownerDmChannel ? ($notifications[$ownerDmChannel->id] ?? 0) : 0"
                     badge-color="blue"
                 >
 
@@ -377,7 +385,7 @@ new class extends Component
                                 wire:click="openDirectMessage({{ $member->id }})"
                                 @contextmenu.prevent="let rect = $refs.sidebar.getBoundingClientRect(); open = true; x = $event.clientX - rect.left; y = $event.clientY - rect.top; type = 'member'; memberId = {{ $member->id }}; memberName = '{{ $memberName }}'"
                                 :current="$activeChannel && $memberDmChannel && $activeChannel->id === $memberDmChannel->id"
-                                :badge="($memberDmChannel && ($notifications[$memberDmChannel->id] ?? 0) > 0) ? $notifications[$memberDmChannel->id] : null"
+                                :badge="$memberDmChannel ? ($notifications[$memberDmChannel->id] ?? 0) : 0"
                                 badge-color="blue"
                             >
                                 <x-slot name="icon">
@@ -391,7 +399,7 @@ new class extends Component
                                 wire:key="member-{{ $member->id }}"
                                 wire:click="openDirectMessage({{ $member->id }})"
                                 :current="$activeChannel && $memberDmChannel && $activeChannel->id === $memberDmChannel->id"
-                                :badge="($memberDmChannel && ($notifications[$memberDmChannel->id] ?? 0) > 0) ? $notifications[$memberDmChannel->id] : null"
+                                :badge="$memberDmChannel ? ($notifications[$memberDmChannel->id] ?? 0) : 0"
                                 badge-color="blue"
                             >
                                 <x-slot name="icon">
@@ -417,11 +425,11 @@ new class extends Component
     </div>
 
     <flux:modal name="create-channel-modal" class="md:w-[500px]">
-        <livewire:create-channel :workspace="$workspace" />
+        <livewire:echochat::create-channel :workspace="$workspace" />
     </flux:modal>
 
     <flux:modal name="invite-workspace-member-modal" class="md:w-[500px]">
-        <livewire:invite-workspace-member :workspace="$workspace" />
+        <livewire:echochat::invite-workspace-member :workspace="$workspace" />
     </flux:modal>
 
     {{-- Context Menu --}}

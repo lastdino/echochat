@@ -5,7 +5,7 @@ use EchoChat\Models\Workspace;
 use EchoChat\Services\AIModelService;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Url;
-use Livewire\Volt\Component;
+use Livewire\Component;
 
 new class extends Component
 {
@@ -56,7 +56,7 @@ new class extends Component
         if ($this->message !== '') {
             $this->messageId = $this->message;
             $parentId = \EchoChat\Models\Message::find($this->message)?->parent_id;
-            $this->dispatch('scrollToMessage', messageId: $this->message, parentId: $parentId)->to('message-feed');
+            $this->dispatch('scrollToMessage', messageId: $this->message, parentId: $parentId)->to('echochat::message-feed');
         }
     }
 
@@ -108,7 +108,7 @@ new class extends Component
 
         $this->dispatch('activity-message-set', messageId: $messageId, channelId: $channelId, ancestorIds: $ancestorIds);
         $this->dispatch('channelSelected', channelId: $channelId);
-        $this->dispatch('scrollToMessage', messageId: $messageId, ancestorIds: $ancestorIds)->to('message-feed');
+        $this->dispatch('scrollToMessage', messageId: $messageId, ancestorIds: $ancestorIds)->to('echochat::message-feed');
     }
 
     public function selectChannel($channelId)
@@ -138,7 +138,7 @@ new class extends Component
 
     public function updatedSearch()
     {
-        $this->dispatch('searchMessages', search: $this->search)->to('message-feed');
+        $this->dispatch('searchMessages', search: $this->search)->to('echochat::message-feed');
     }
 
     public function toggleSearch()
@@ -196,7 +196,7 @@ new class extends Component
         :class="{ 'translate-x-0': showSidebar, '-translate-x-full': !showSidebar }"
         class="fixed inset-y-0 left-0 z-40 w-64 bg-zinc-100 dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700 transition-transform duration-300 lg:relative lg:translate-x-0 lg:flex-shrink-0"
     >
-        <livewire:channel-list :workspace="$workspace" :activeChannel="$activeChannel" />
+        <livewire:echochat::channel-list :workspace="$workspace" :activeChannel="$activeChannel" />
     </div>
 
     <!-- Backdrop for mobile -->
@@ -306,7 +306,7 @@ new class extends Component
                 </div>
 
                 <flux:modal name="activity-feed" variant="flyout" class="md:w-[400px]">
-                    <livewire:activity-feed
+                    <livewire:echochat::activity-feed
                         :workspace="$workspace"
                         wire:key="activity-feed-{{ $workspace->id }}"
                     />
@@ -431,16 +431,16 @@ new class extends Component
                 >
                     <div class="flex-1"></div>
                     <div>
-                        <livewire:message-feed :channel="$activeChannel" wire:key="feed-{{ $activeChannel->id }}"/>
+                        <livewire:echochat::message-feed :channel="$activeChannel" wire:key="feed-{{ $activeChannel->id }}"/>
                     </div>
                 </div>
 
                 <div class="p-4">
                     @if($activeChannel->isMember(auth()->id()))
                         @if(config('echochat.flux_pro'))
-                            <livewire:message-input-pro :channel="$activeChannel" wire:key="input-pro-{{ $activeChannel->id }}"/>
+                            <livewire:echochat::message-input-pro :channel="$activeChannel" wire:key="input-pro-{{ $activeChannel->id }}"/>
                         @else
-                            <livewire:message-input :channel="$activeChannel" wire:key="input-{{ $activeChannel->id }}"/>
+                            <livewire:echochat::message-input :channel="$activeChannel" wire:key="input-{{ $activeChannel->id }}"/>
                         @endif
                     @elseif($activeChannel->canJoin(auth()->id()))
                         <div
@@ -463,13 +463,13 @@ new class extends Component
 
                 @if($activeChannel->is_private)
                     <flux:modal name="invite-member-modal" class="md:w-[500px]">
-                        <livewire:invite-member :channel="$activeChannel"/>
+                        <livewire:echochat::invite-member :channel="$activeChannel"/>
                     </flux:modal>
                 @endif
 
                 @can('update', $activeChannel)
                     <flux:modal name="edit-channel-modal" class="md:w-[500px]">
-                        <livewire:edit-channel :channel="$activeChannel" wire:key="edit-{{ $activeChannel->id }}"/>
+                        <livewire:echochat::edit-channel :channel="$activeChannel" wire:key="edit-{{ $activeChannel->id }}"/>
                     </flux:modal>
                 @endcan
             </div>

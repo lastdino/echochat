@@ -6,7 +6,7 @@ use EchoChat\Models\Workspace;
 use EchoChat\Support\UserSupport;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
-use Livewire\Volt\Component;
+use Livewire\Component;
 
 new class extends Component
 {

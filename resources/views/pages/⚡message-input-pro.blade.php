@@ -5,7 +5,7 @@ use EchoChat\Models\Channel;
 use EchoChat\Models\ChannelUser;
 use EchoChat\Models\Message;
 use EchoChat\Notifications\MentionedInMessage;
-use Livewire\Volt\Component;
+use Livewire\Component;
 use Livewire\WithFileUploads;
 
 new class extends Component
@@ -205,6 +205,37 @@ new class extends Component
         mentionIndex: @entangle('mentionIndex'),
         cursorPos: 0,
         mentionStart: 0,
+        lastContent: '',
+        getPlainText(html) {
+            if (!html) return '';
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            return temp.textContent || temp.innerText || '';
+        },
+        init() {
+            this.$watch('$wire.content', (value) => {
+                this.checkForMention(value);
+            });
+        },
+        checkForMention(content) {
+            const text = this.getPlainText(content || '');
+            const pos = text.length;
+            this.cursorPos = pos;
+
+            const lastAt = text.lastIndexOf('@');
+            if (lastAt !== -1 && (lastAt === 0 || /\s/.test(text[lastAt - 1]))) {
+                const query = text.substring(lastAt + 1);
+                if (!/\s/.test(query)) {
+                    this.showMentions = true;
+                    this.mentionStart = lastAt;
+                    this.mentionSearch = query;
+                    // 入力が進むたびにメンション候補を更新
+                    $wire.loadMentions();
+                    return;
+                }
+            }
+            this.showMentions = false;
+        },
         handleKeydown(e) {
             if (this.showMentions) {
                 if (e.key === 'ArrowDown') {
@@ -222,51 +253,29 @@ new class extends Component
             }
         },
         handleInput(e) {
-            const textarea = e.target;
-            const text = textarea.value || '';
-            const pos = textarea.selectionStart || 0;
-            this.cursorPos = pos;
-
-            const lastAt = text.lastIndexOf('@', pos - 1);
-            if (lastAt !== -1 && (lastAt === 0 || /\s/.test(text[lastAt - 1]))) {
-                const query = text.substring(lastAt + 1, pos);
-                if (!/\s/.test(query)) {
-                    this.showMentions = true;
-                    this.mentionStart = lastAt;
-                    this.mentionSearch = query;
-                    // 入力が進むたびにメンション候補を更新
-                    $wire.loadMentions();
-                    return;
-                }
-            }
-            this.showMentions = false;
+            const content = $wire.get('content') || '';
+            this.checkForMention(content);
         },
         triggerMention() {
-            const textarea = this.$refs.textarea;
-            const text = textarea.value || '';
-            const pos = textarea.selectionStart || 0;
-
-            // 現在のカーソル位置に @ を挿入
-            const before = text.substring(0, pos);
-            const after = text.substring(pos);
-            const newContent = before + '@' + after;
+            const editor = this.$el.querySelector('[data-flux-editor]');
+            const currentContent = $wire.get('content') || '';
+            const newContent = currentContent + '@';
 
             $wire.set('content', newContent);
 
             this.$nextTick(() => {
-                const newPos = pos + 1;
-                textarea.focus();
-                if (textarea.setSelectionRange) {
-                    textarea.setSelectionRange(newPos, newPos);
+                if (editor) {
+                    editor.focus();
                 }
-
-                // inputイベントを擬似的に発生させてメンションリストを表示させる
-                this.handleInput({ target: textarea });
+                this.showMentions = true;
+                this.mentionStart = this.getPlainText(newContent).length - 1;
+                this.cursorPos = this.getPlainText(newContent).length;
+                this.mentionSearch = '';
+                $wire.loadMentions();
             });
         },
         selectMention(member) {
-            const textarea = this.$refs.textarea;
-            const text = textarea.value;
+            const text = this.getPlainText($wire.get('content') || '');
             const before = text.substring(0, this.mentionStart);
             const after = text.substring(this.cursorPos);
             const newContent = before + '@' + member.name + ' ' + after;
@@ -275,10 +284,9 @@ new class extends Component
             this.showMentions = false;
 
             this.$nextTick(() => {
-                const newPos = before.length + member.name.length + 2;
-                textarea.focus();
-                if (textarea.setSelectionRange) {
-                    textarea.setSelectionRange(newPos, newPos);
+                const editor = this.$el.querySelector('[data-flux-editor]');
+                if (editor) {
+                    editor.focus();
                 }
             });
         }
@@ -311,7 +319,7 @@ new class extends Component
         </div>
 
         @if($replyToMessage)
-            <div class="flex items-center justify-between p-2 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-700 rounded-t-lg">
+            <div class="flex items-center justify-between mb-1 p-2 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-700 rounded-lg">
                 <div class="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 overflow-hidden">
                     <flux:icon icon="arrow-uturn-left" class="w-3 h-3 flex-shrink-0" />
                     <span class="font-bold flex-shrink-0">{{ $replyToMessage->user->name }}</span>
@@ -324,7 +332,7 @@ new class extends Component
         @endif
 
         @if(count($attachments) > 0)
-            <div class="flex flex-wrap gap-2 p-2 border-b border-zinc-200 dark:border-zinc-700">
+            <div class="flex flex-wrap gap-2 mb-1 p-2 border-b border-zinc-200 dark:border-zinc-700">
                 @foreach($attachments as $index => $attachment)
                     <div class="relative group">
                         @if(str_starts_with($attachment->getMimeType(), 'image/'))
@@ -343,79 +351,71 @@ new class extends Component
             </div>
         @endif
 
-        <textarea
-            x-ref="textarea"
-            wire:model="content"
-            @input="handleInput"
-            @keydown="handleKeydown"
-            placeholder="# {{ $channel->name }} へのメッセージ"
-            class="w-full bg-transparent border-none focus:ring-0 focus:outline-none dark:text-white resize-none p-3"
-            rows="3"
-        ></textarea>
+            <flux:composer wire:model="content" rows="3" label="メッセージ" label:sr-only placeholder="# {{ $channel->name }} へのメッセージ"
+                           x-ref="textarea"
+                           @input="handleInput"
+                           @keydown="handleKeydown">
+                <x-slot name="input">
+                    <flux:editor variant="borderless" toolbar="bold italic bullet ordered | link | align"
+                        @input.stop="handleInput"
+                        @keydown.stop="handleKeydown"
+                    />
+                </x-slot>
+                <x-slot name="actionsLeading">
+                    <flux:button size="sm" icon="at-symbol" variant="subtle" @click="triggerMention"></flux:button>
+                    <flux:modal.trigger name="file-upload-modal">
+                        <flux:button size="sm" variant="subtle" icon="paper-clip" />
+                    </flux:modal.trigger>
+                    <flux:dropdown>
+                        <flux:button size="sm" variant="subtle" icon="face-smile" icon:variant="outline"  />
 
-        <div class="flex items-center justify-between p-2">
-            <div class="flex items-center gap-2">
-                <button type="button" @click="triggerMention" class="p-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 rounded hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors" title="メンションを追加">
-                    <span class="text-lg font-bold">@</span>
-                </button>
-
-                <flux:modal.trigger name="file-upload-modal">
-                    <flux:button type="button" variant="subtle" icon="paper-clip" square class="p-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300" />
-                </flux:modal.trigger>
-
-                <flux:modal name="file-upload-modal" class="md:w-[400px]">
-                    <div class="space-y-6">
-                        <div>
-                            <flux:heading size="lg">ファイルを添付</flux:heading>
-                            <flux:subheading>送信するファイルを選択してください。</flux:subheading>
-                        </div>
-
-                        <div
-                            x-data="{ isDragging: false }"
-                            @dragover.prevent="isDragging = true"
-                            @dragleave.prevent="isDragging = false"
-                            @drop.prevent="isDragging = false; $refs.fileInput.files = $event.dataTransfer.files; $refs.fileInput.dispatchEvent(new Event('change'))"
-                            :class="isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-zinc-300 dark:border-zinc-700'"
-                            class="relative border-2 border-dashed rounded-xl p-8 transition-colors"
-                        >
-                            <input
-                                type="file"
-                                wire:model="attachments"
-                                multiple
-                                class="absolute inset-0 opacity-0 cursor-pointer"
-                                x-ref="fileInput"
-                                @change="Flux.modal('file-upload-modal').close()"
-                            />
-
-                            <div class="flex flex-col items-center justify-center gap-2 text-zinc-500">
-                                <flux:icon icon="arrow-up-tray" class="w-8 h-8" />
-                                <div class="text-sm font-medium">クリックまたはドラッグ＆ドロップでアップロード</div>
-                                <div class="text-xs">最大 10MB</div>
+                        <flux:menu class="w-64 p-2">
+                            <div class="grid grid-cols-8 gap-1">
+                                @foreach(['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖'] as $emoji)
+                                    <button type="button" @click="$wire.set('content', $wire.get('content') + '{{ $emoji }}')" class="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-xl">
+                                        {{ $emoji }}
+                                    </button>
+                                @endforeach
                             </div>
-                        </div>
-
-                        <div class="flex">
-                            <flux:spacer />
-                            <flux:button x-on:click="Flux.modal('file-upload-modal').close()">キャンセル</flux:button>
-                        </div>
+                        </flux:menu>
+                    </flux:dropdown>
+                </x-slot>
+                <x-slot name="actionsTrailing">
+                    <flux:button type="submit" size="sm" variant="primary" icon="paper-airplane" />
+                </x-slot>
+            </flux:composer>
+            <flux:modal name="file-upload-modal" class="md:w-[400px]">
+                <div class="space-y-6">
+                    <div>
+                        <flux:heading size="lg">ファイルを添付</flux:heading>
+                        <flux:subheading>送信するファイルを選択してください。</flux:subheading>
                     </div>
-                </flux:modal>
+                    <flux:file-upload wire:model="attachments" multiple label="">
+                        <flux:file-upload.dropzone
+                            heading="ファイルをドロップするかクリックして参照してください"
+                            text="最大 10MB"
+                            with-progress
+                            inline
+                        />
+                    </flux:file-upload>
 
-                <flux:dropdown>
-                    <flux:button type="button" variant="subtle" icon="face-smile" icon:variant="outline" square class="p-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300" />
+                    <div class="mt-3 flex flex-col gap-2">
+                        @foreach ($attachments as $index => $photo)
+                            <flux:file-item
+                                :heading="$photo->getClientOriginalName()"
+                            >
+                                <x-slot name="actions">
+                                    <flux:file-item.remove wire:click="removeAttachment({{ $index }})" aria-label="{{ 'Remove file: ' . $photo->getClientOriginalName() }}" />
+                                </x-slot>
+                            </flux:file-item>
+                        @endforeach
+                    </div>
 
-                    <flux:menu class="w-64 p-2">
-                        <div class="grid grid-cols-8 gap-1">
-                            @foreach(['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖'] as $emoji)
-                                <button type="button" @click="$wire.set('content', $wire.get('content') + '{{ $emoji }}')" class="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-xl">
-                                    {{ $emoji }}
-                                </button>
-                            @endforeach
-                        </div>
-                    </flux:menu>
-                </flux:dropdown>
-            </div>
-            <flux:button type="submit" size="sm" variant="primary" icon="paper-airplane" />
-        </div>
+                    <div class="flex">
+                        <flux:spacer />
+                        <flux:button x-on:click="Flux.modal('file-upload-modal').close()">閉じる</flux:button>
+                    </div>
+                </div>
+            </flux:modal>
     </div>
 </form>

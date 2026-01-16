@@ -2,7 +2,7 @@
 
 use EchoChat\Models\Workspace;
 use EchoChat\Models\Channel;
-use Livewire\Volt\Component;
+use Livewire\Component;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Gate;
 
@@ -34,7 +34,7 @@ new class extends Component {
 
         $this->dispatch('close-modal', 'create-channel-modal');
         $this->dispatch('channelCreated');
-        $this->dispatch('channelSelected', $channel->id)->to('chat');
+        $this->dispatch('channelSelected', $channel->id)->to('echochat::chat');
     }
 }; ?>
 

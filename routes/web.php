@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
-use Livewire\Volt\Volt;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 Route::middleware(['web', 'auth'])->group(function () {
@@ -35,12 +34,13 @@ Route::middleware(['web', 'auth'])->group(function () {
         );
     })->name('echochat.attachments.show');
 
-    Volt::route($path.'/workspaces', 'workspace-list')
+    Route::livewire($path.'/workspaces', 'echochat::workspace-list')
         ->name('echochat.workspaces');
 
-    Volt::route($path.'/{workspace:slug}/settings', 'workspace-settings')
+    Route::livewire($path.'/{workspace:slug}/settings', 'echochat::workspace-settings')
         ->name('echochat.workspaces.settings');
 
-    Volt::route($path.'/{workspace:slug}/{channel?}/{message?}', 'chat')
+    Route::livewire($path.'/{workspace:slug}/{channel?}/{message?}', 'echochat::chat')
         ->name('echochat.chat');
+
 });

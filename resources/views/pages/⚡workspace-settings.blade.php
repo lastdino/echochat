@@ -1,7 +1,7 @@
 <?php
 
 use EchoChat\Models\Workspace;
-use Livewire\Volt\Component;
+use Livewire\Component;
 use Illuminate\Support\Facades\Gate;
 use Flux\Flux;
 
