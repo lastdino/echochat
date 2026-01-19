@@ -10,7 +10,7 @@ new class extends Component {
     public string $name;
     public bool $allow_member_channel_creation;
     public bool $allow_member_channel_deletion;
-    public ?string $ai_prompt;
+    public ?string $ai_prompt= null;
 
     public function mount(Workspace $workspace)
     {
