@@ -27,6 +27,7 @@ class EchoChatServiceProvider extends ServiceProvider
 
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'echochat');
+
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
 
         if (file_exists(__DIR__.'/../routes/channels.php')) {
@@ -51,11 +52,17 @@ class EchoChatServiceProvider extends ServiceProvider
             ], 'echochat-flux-icons');
         }
 
-        // Register Livewire components
-        Livewire::addNamespace(
-            namespace: 'echochat',
-            viewPath: __DIR__.'/../resources/views/pages'
-        );
+        $this->registerLivewireComponents();
+    }
 
+    protected function registerLivewireComponents(): void
+    {
+        Livewire::addNamespace('echochat', __DIR__.'/../resources/views/pages');
+
+        // もし公開されたビューがあれば、そちらを優先するようにLivewireコンポーネントを再登録
+        $publishedPath = resource_path('views/vendor/echochat/pages');
+        if (is_dir($publishedPath) && count(array_diff(scandir($publishedPath), ['.', '..'])) > 0) {
+            Livewire::addNamespace('echochat', $publishedPath);
+        }
     }
 }
