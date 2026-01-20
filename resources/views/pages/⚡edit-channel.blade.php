@@ -2,7 +2,7 @@
 
 use EchoChat\Models\Channel;
 use Illuminate\Support\Facades\Gate;
-use Livewire\Volt\Component;
+use Livewire\Component;
 
 new class extends Component
 {
@@ -35,7 +35,7 @@ new class extends Component
 
         $this->dispatch('close-modal', 'edit-channel-modal');
         $this->dispatch('channelUpdated');
-        $this->dispatch('channelSelected', $this->channel->id)->to('chat');
+        $this->dispatch('channelSelected', $this->channel->id)->to('echochat::chat');
     }
 }; ?>
 

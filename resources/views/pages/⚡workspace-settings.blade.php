@@ -1,7 +1,7 @@
 <?php
 
 use EchoChat\Models\Workspace;
-use Livewire\Volt\Component;
+use Livewire\Component;
 use Illuminate\Support\Facades\Gate;
 use Flux\Flux;
 
@@ -10,7 +10,7 @@ new class extends Component {
     public string $name;
     public bool $allow_member_channel_creation;
     public bool $allow_member_channel_deletion;
-    public ?string $ai_prompt;
+    public ?string $ai_prompt= null;
 
     public function mount(Workspace $workspace)
     {

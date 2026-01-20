@@ -3,7 +3,7 @@
 use App\Models\User;
 use EchoChat\Models\Channel;
 use Livewire\Attributes\Computed;
-use Livewire\Volt\Component;
+use Livewire\Component;
 
 new class extends Component
 {
@@ -60,7 +60,7 @@ new class extends Component
         $this->selectedUserIds = [];
         $this->message = count($users).'人のユーザーを招待しました。';
         $this->dispatch('memberAdded');
-        $this->dispatch('memberAdded')->to('chat');
+        $this->dispatch('memberAdded')->to('echochat::chat');
         $this->dispatch('messageSent');
     }
 }; ?>

@@ -4,7 +4,7 @@ declare(strict_types=1);
 use EchoChat\Models\Workspace;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
-use Livewire\Volt\Component;
+use Livewire\Component;
 
 new class extends Component
 {

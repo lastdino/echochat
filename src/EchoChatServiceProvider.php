@@ -8,7 +8,7 @@ use EchoChat\Policies\ChannelPolicy;
 use EchoChat\Policies\WorkspacePolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
-use Livewire\Volt\Volt;
+use Livewire\Livewire;
 
 class EchoChatServiceProvider extends ServiceProvider
 {
@@ -51,15 +51,11 @@ class EchoChatServiceProvider extends ServiceProvider
             ], 'echochat-flux-icons');
         }
 
-        // Register Volt components
-        $voltPaths = [];
+        // Register Livewire components
+        Livewire::addNamespace(
+            namespace: 'echochat',
+            viewPath: __DIR__.'/../resources/views/pages'
+        );
 
-        if (is_dir(resource_path('views/vendor/echochat/livewire'))) {
-            $voltPaths[] = resource_path('views/vendor/echochat/livewire');
-        }
-
-        $voltPaths[] = __DIR__.'/../resources/views/livewire';
-
-        Volt::mount($voltPaths);
     }
 }

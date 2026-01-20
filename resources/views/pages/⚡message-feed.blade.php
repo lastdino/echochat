@@ -1,7 +1,7 @@
 <?php
 
 use EchoChat\Models\Channel;
-use Livewire\Volt\Component;
+use Livewire\Component;
 
 new class extends Component
 {
@@ -27,7 +27,7 @@ new class extends Component
 
     public function handleMessageSent()
     {
-        $this->dispatch('message-sent')->to('chat');
+        $this->dispatch('message-sent')->to('echochat::chat');
     }
 
     public function updateSearch(string $search)
