@@ -90,6 +90,45 @@
                     editor.focus();
                 }
             });
+        },
+        handlePaste(e) {
+            const clipboardData = e.clipboardData || e.originalEvent?.clipboardData;
+            if (!clipboardData) return;
+
+            const items = clipboardData.items;
+            const files = [];
+            let hasImage = false;
+
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile();
+                    if (blob) {
+                        files.push(blob);
+                        hasImage = true;
+                    }
+                }
+            }
+
+            if (hasImage) {
+                // 画像が含まれている場合は、デフォルトの貼り付け動作を完全に阻止する
+                e.preventDefault();
+                e.stopImmediatePropagation();
+
+                // クリップボードに画像がある場合は、Livewireのアップロード機能を使用
+                $wire.uploadMultiple('attachments', files,
+                    (uploadedFilename) => {
+                        // Success
+                    },
+                    () => {
+                        // Error
+                    },
+                    (event) => {
+                        // Progress
+                    }
+                );
+
+                return false;
+            }
         }
     }"
 >
@@ -155,11 +194,14 @@
             <flux:composer wire:model="content" rows="3" label="メッセージ" label:sr-only placeholder="# {{ $channel->name }} へのメッセージ"
                            x-ref="textarea"
                            @input="handleInput"
-                           @keydown="handleKeydown">
+                           @keydown="handleKeydown"
+                           @paste="handlePaste">
                 <x-slot name="input">
                     <flux:editor variant="borderless" toolbar="bold italic bullet ordered | link | align"
+                        @trix-before-paste.stop="handlePaste"
                         @input.stop="handleInput"
                         @keydown.stop="handleKeydown"
+                        @paste.stop="handlePaste"
                     />
                 </x-slot>
                 <x-slot name="actionsLeading">

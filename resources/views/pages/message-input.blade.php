@@ -82,6 +82,39 @@
                     textarea.setSelectionRange(newPos, newPos);
                 }
             });
+        },
+        handlePaste(e) {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            const files = [];
+            let hasImage = false;
+
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile();
+                    if (blob) {
+                        files.push(blob);
+                        hasImage = true;
+                    }
+                }
+            }
+
+            if (hasImage) {
+                // 画像が含まれている場合は、テキストの貼り付けを防ぐ
+                e.preventDefault();
+
+                // クリップボードに画像がある場合は、Livewireのアップロード機能を使用
+                $wire.uploadMultiple('attachments', files,
+                    (uploadedFilename) => {
+                        // Success
+                    },
+                    () => {
+                        // Error
+                    },
+                    (event) => {
+                        // Progress
+                    }
+                );
+            }
         }
     }"
 >
@@ -149,6 +182,7 @@
             wire:model="content"
             @input="handleInput"
             @keydown="handleKeydown"
+            @paste="handlePaste"
             placeholder="# {{ $channel->name }} へのメッセージ"
             class="w-full bg-transparent border-none focus:ring-0 focus:outline-none dark:text-white resize-none p-3"
             rows="3"

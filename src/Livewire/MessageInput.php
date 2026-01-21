@@ -195,7 +195,9 @@ class MessageInput extends Component
 
     public function removeAttachment($index): void
     {
-        array_splice($this->attachments, $index, 1);
+        if (isset($this->attachments[$index])) {
+            array_splice($this->attachments, $index, 1);
+        }
     }
 
     public function render(): View
