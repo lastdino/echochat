@@ -1,15 +1,21 @@
 <?php
 
+namespace EchoChat\Livewire;
+
 use EchoChat\Models\Channel;
+use EchoChat\Models\Message;
+use EchoChat\Models\MessageReaction;
+use EchoChat\Support\UserSupport;
+use Illuminate\View\View;
 use Livewire\Component;
 
-new class extends Component
+class MessageFeed extends Component
 {
     public Channel $channel;
 
     public string $search = '';
 
-    public function getListeners()
+    public function getListeners(): array
     {
         return [
             "echo-private:workspace.{$this->channel->workspace_id}.channel.{$this->channel->id},.EchoChat\\Events\\MessageSent" => 'handleMessageSent',
@@ -20,22 +26,22 @@ new class extends Component
         ];
     }
 
-    public function scrollToMessage(int $messageId, array $ancestorIds = [])
+    public function scrollToMessage(int $messageId, array $ancestorIds = []): void
     {
         $this->dispatch('message-target-scrolled', messageId: $messageId, ancestorIds: $ancestorIds);
     }
 
-    public function handleMessageSent()
+    public function handleMessageSent(): void
     {
-        $this->dispatch('message-sent')->to('echochat::chat');
+        $this->dispatch('message-sent')->to(Chat::class);
     }
 
-    public function updateSearch(string $search)
+    public function updateSearch(string $search): void
     {
         $this->search = $search;
     }
 
-    public function with()
+    public function render(): View
     {
         $query = $this->channel->messages()
             ->with(['user', 'media', 'parent.user', 'reactions.user', 'replies.user', 'replies.media', 'replies.reactions.user', 'replies.replies'])
@@ -57,19 +63,21 @@ new class extends Component
             $query->whereNull('parent_id');
         }
 
-        return [
-            'groupedMessages' => $query->get()->groupBy(fn ($message) => $message->created_at->translatedFormat(config('echochat.date_format', 'n月j日 (D)'))),
-        ];
+        $groupedMessages = $query->get()->groupBy(fn ($message) => $message->created_at->translatedFormat(config('echochat.date_format', 'n月j日 (D)')));
+
+        return view('echochat::pages.message-feed', [
+            'groupedMessages' => $groupedMessages,
+        ]);
     }
 
-    public function replyTo(int $messageId)
+    public function replyTo(int $messageId): void
     {
         $this->dispatch('setReplyTo', messageId: $messageId);
     }
 
-    public function deleteAttachment(int $messageId, int $mediaId)
+    public function deleteAttachment(int $messageId, int $mediaId): void
     {
-        $message = \EchoChat\Models\Message::findOrFail($messageId);
+        $message = Message::findOrFail($messageId);
 
         // 基本的な権限チェック：メッセージの作成者のみ削除可能とする
         if ($message->user_id !== auth()->id()) {
@@ -88,10 +96,10 @@ new class extends Component
         }
     }
 
-    public function toggleReaction(int $messageId, string $emoji)
+    public function toggleReaction(int $messageId, string $emoji): void
     {
         $userId = auth()->id();
-        $reaction = \EchoChat\Models\MessageReaction::where('message_id', $messageId)
+        $reaction = MessageReaction::where('message_id', $messageId)
             ->where('user_id', $userId)
             ->where('emoji', $emoji)
             ->first();
@@ -100,7 +108,7 @@ new class extends Component
             $reaction->delete();
             broadcast(new \EchoChat\Events\ReactionUpdated($reaction, 'removed'))->toOthers();
         } else {
-            $reaction = \EchoChat\Models\MessageReaction::create([
+            $reaction = MessageReaction::create([
                 'message_id' => $messageId,
                 'user_id' => $userId,
                 'emoji' => $emoji,
@@ -143,7 +151,7 @@ new class extends Component
         $names = $this->channel->members()
             ->with('user')
             ->get()
-            ->map(fn ($m) => \EchoChat\Support\UserSupport::getName($m->user))
+            ->map(fn ($m) => UserSupport::getName($m->user))
             ->filter()
             ->unique()
             ->sortByDesc(fn ($name) => strlen($name));
@@ -155,7 +163,7 @@ new class extends Component
             $replacements[$replacement] = '<span class="bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-1 rounded font-medium">'.$mention.'</span>';
         }
 
-        if (isset($replacements)) {
+        if (count($replacements) > 0) {
             foreach ($replacements as $placeholder => $html) {
                 $withBreaks = str_replace($placeholder, $html, $withBreaks);
             }
@@ -163,32 +171,4 @@ new class extends Component
 
         return $withBreaks;
     }
-}; ?>
-
-<div class="p-4 space-y-4">
-    @foreach($groupedMessages as $date => $messages)
-        <div
-            x-data="{ open: true }"
-            x-on:expand-date-groups.window="if ($event.detail.messageId && document.getElementById('message-' + $event.detail.messageId)) open = true"
-            class="space-y-4"
-            wire:key="date-group-{{ $channel->id }}-{{ Str::slug($date) }}"
-        >
-            <div class="flex items-center gap-4 my-4 group/date cursor-pointer select-none" @click="open = !open">
-                <div class="flex-1 border-t border-zinc-200 dark:border-zinc-700"></div>
-                <div class="flex items-center gap-2">
-                    <flux:badge variant="neutral" size="sm" class="px-3 py-1 font-medium group-hover/date:bg-zinc-200 dark:group-hover/date:bg-zinc-700 transition-colors">
-                        {{ $date }}
-                    </flux:badge>
-                    <flux:icon icon="chevron-down" class="w-4 h-4 text-zinc-400 transition-transform duration-200" x-bind:class="{ '-rotate-90': !open }" />
-                </div>
-                <div class="flex-1 border-t border-zinc-200 dark:border-zinc-700"></div>
-            </div>
-
-            <div x-show="open" x-collapse class="space-y-4">
-                @foreach($messages as $message)
-                    <x-echochat::message-item :message="$message" />
-                @endforeach
-            </div>
-        </div>
-    @endforeach
-</div>
+}

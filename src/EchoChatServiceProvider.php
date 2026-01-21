@@ -22,6 +22,8 @@ class EchoChatServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->registerLivewireComponents();
+
         Gate::policy(Workspace::class, WorkspacePolicy::class);
         Gate::policy(Channel::class, ChannelPolicy::class);
 
@@ -52,17 +54,26 @@ class EchoChatServiceProvider extends ServiceProvider
             ], 'echochat-flux-icons');
         }
 
-        $this->registerLivewireComponents();
     }
 
     protected function registerLivewireComponents(): void
     {
-        Livewire::addNamespace('echochat', __DIR__.'/../resources/views/pages');
+        Livewire::component('echochat-chat', \EchoChat\Livewire\Chat::class);
+        Livewire::component('echochat-message-feed', \EchoChat\Livewire\MessageFeed::class);
+        Livewire::component('echochat-activity-feed', \EchoChat\Livewire\ActivityFeed::class);
+        Livewire::component('echochat-channel-list', \EchoChat\Livewire\ChannelList::class);
+        Livewire::component('echochat-message-input', \EchoChat\Livewire\MessageInput::class);
+        Livewire::component('echochat-message-input-pro', \EchoChat\Livewire\MessageInputPro::class);
+        Livewire::component('echochat-create-channel', \EchoChat\Livewire\CreateChannel::class);
+        Livewire::component('echochat-edit-channel', \EchoChat\Livewire\EditChannel::class);
+        Livewire::component('echochat-invite-member', \EchoChat\Livewire\InviteMember::class);
+        Livewire::component('echochat-invite-workspace-member', \EchoChat\Livewire\InviteWorkspaceMember::class);
+        Livewire::component('echochat-workspace-list', \EchoChat\Livewire\WorkspaceList::class);
+        Livewire::component('echochat-workspace-settings', \EchoChat\Livewire\WorkspaceSettings::class);
+        Livewire::component('echochat-nav-item', \EchoChat\Livewire\NavItem::class);
 
-        // もし公開されたビューがあれば、そちらを優先するようにLivewireコンポーネントを再登録
-        $publishedPath = resource_path('views/vendor/echochat/pages');
-        if (is_dir($publishedPath) && count(array_diff(scandir($publishedPath), ['.', '..'])) > 0) {
-            Livewire::addNamespace('echochat', $publishedPath);
-        }
+        // Blade components
+        \Illuminate\Support\Facades\Blade::component('echochat::components.nav-item-with-badge', 'echochat-nav-item-with-badge');
+        \Illuminate\Support\Facades\Blade::component('echochat::components.message-item', 'echochat-message-item');
     }
 }

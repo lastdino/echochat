@@ -164,7 +164,7 @@
                 class="mt-3 space-y-3 pl-4 border-l-2 border-zinc-100 dark:border-zinc-800"
             >
                 @foreach($message->replies as $reply)
-                    <x-echochat::message-item :message="$reply" :is-reply="true" />
+                    <x-echochat-message-item :message="$reply" :is-reply="true" />
                 @endforeach
 
                 @if(! $isReply)

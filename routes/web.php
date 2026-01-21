@@ -34,16 +34,13 @@ Route::middleware(['web', 'auth'])->group(function () {
         );
     })->name('echochat.attachments.show');
 
-    Route::get($path.'/workspaces', \Livewire\Features\SupportRouting\LivewirePageController::class)
-        ->defaults('_livewire_component', 'echochat::workspace-list')
+    Route::get($path.'/workspaces', \EchoChat\Livewire\WorkspaceList::class)
         ->name('echochat.workspaces');
 
-    Route::get($path.'/{workspace:slug}/settings', \Livewire\Features\SupportRouting\LivewirePageController::class)
-        ->defaults('_livewire_component', 'echochat::workspace-settings')
+    Route::get($path.'/{workspace:slug}/settings', \EchoChat\Livewire\WorkspaceSettings::class)
         ->name('echochat.workspaces.settings');
 
-    Route::get($path.'/{workspace:slug}/{channel?}/{message?}', \Livewire\Features\SupportRouting\LivewirePageController::class)
-        ->defaults('_livewire_component', 'echochat::chat')
+    Route::get($path.'/{workspace:slug}/{channel?}/{message?}', \EchoChat\Livewire\Chat::class)
         ->name('echochat.chat');
 
 });

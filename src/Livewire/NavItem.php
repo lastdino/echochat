@@ -1,9 +1,12 @@
 <?php
 
+namespace EchoChat\Livewire;
+
 use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
 use Livewire\Component;
 
-new class extends Component
+class NavItem extends Component
 {
     public $user;
 
@@ -17,7 +20,7 @@ new class extends Component
         }
     }
 
-    public function getListeners()
+    public function getListeners(): array
     {
         $userId = auth()->id();
         $listeners = [
@@ -35,17 +38,15 @@ new class extends Component
         return $listeners;
     }
 
-    public function refreshUnreadCount()
+    public function refreshUnreadCount(): void
     {
         if (Auth::check()) {
-            // Auth::user() がキャッシュされている可能性を考慮し、
-            // getTotalUnreadCount 内部で常に最新のクエリが走るように InteractsWithWorkspaces を修正済み。
-            // ここではプロパティを最新の計算結果で更新する。
             $this->unreadNotifications = Auth::user()->getTotalUnreadCount();
         }
     }
-}; ?>
 
-<div class="w-full">
-    <flux:sidebar.item icon="chat-bubble-left-right" :href="route('echochat.workspaces')" :current="request()->routeIs('echochat.workspaces')" :badge="$unreadNotifications ?: null" badgeColor="red">{{ __('Inbox') }}</flux:sidebar.item>
-</div>
+    public function render(): View
+    {
+        return view('echochat::pages.nav-item');
+    }
+}

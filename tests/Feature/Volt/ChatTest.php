@@ -1,12 +1,14 @@
 <?php
 
+use Livewire\Livewire;
+
 use App\Models\User;
 use EchoChat\Events\MessageSent;
 use EchoChat\Models\ChannelUser;
 use EchoChat\Models\Workspace;
 use EchoChat\Support\Tables;
 use Illuminate\Support\Facades\Event;
-use Livewire\Volt\Volt;
+
 
 test('chat component can be rendered', function () {
     $user = User::factory()->create();
@@ -20,7 +22,7 @@ test('chat component can be rendered', function () {
         'creator_id' => $user->id,
     ]);
 
-    Volt::actingAs($user)
+    Livewire::actingAs($user)
         ->test('chat', ['workspace' => $workspace])
         ->assertSee('general');
 });
@@ -39,7 +41,7 @@ test('messages can be sent and broadcasted', function () {
         'creator_id' => $user->id,
     ]);
 
-    Volt::actingAs($user)
+    Livewire::actingAs($user)
         ->test('message-input', ['channel' => $channel])
         ->set('content', 'Hello world')
         ->call('sendMessage')
@@ -73,7 +75,7 @@ test('messages with emojis can be sent', function () {
         'creator_id' => $user->id,
     ]);
 
-    Volt::actingAs($user)
+    Livewire::actingAs($user)
         ->test('message-input', ['channel' => $channel])
         ->set('content', 'Hello 😀')
         ->call('sendMessage')
@@ -94,7 +96,7 @@ test('channels can be created', function () {
         'owner_id' => $user->id,
     ]);
 
-    Volt::actingAs($user)
+    Livewire::actingAs($user)
         ->test('create-channel', ['workspace' => $workspace])
         ->set('name', 'New Channel')
         ->call('createChannel')
@@ -126,7 +128,7 @@ test('replying to a message', function () {
         'content' => 'Parent message',
     ]);
 
-    Volt::actingAs($user)
+    Livewire::actingAs($user)
         ->test('message-input', ['channel' => $channel])
         ->call('setReplyTo', $parentMessage->id)
         ->assertSet('replyToId', $parentMessage->id)
@@ -152,7 +154,7 @@ test('channel list receives notifications', function () {
     $channel1 = $workspace->channels()->create(['name' => 'general', 'creator_id' => $user->id]);
     $channel2 = $workspace->channels()->create(['name' => 'random', 'creator_id' => $user->id]);
 
-    Volt::actingAs($user)
+    Livewire::actingAs($user)
         ->test('channel-list', ['workspace' => $workspace, 'activeChannel' => $channel1])
         ->call('handleIncomingMessage', ['channel_id' => $channel2->id])
         ->assertSet('notifications.'.$channel2->id, 1)
@@ -177,7 +179,7 @@ test('channel list shows persistent notifications on mount', function () {
         'created_at' => now()->subMinutes(5),
     ]);
 
-    Volt::actingAs($user)
+    Livewire::actingAs($user)
         ->test('channel-list', ['workspace' => $workspace])
         ->assertSet('notifications.'.$channel->id, 1);
 
@@ -188,7 +190,7 @@ test('channel list shows persistent notifications on mount', function () {
         'last_read_at' => now(),
     ]);
 
-    Volt::actingAs($user)
+    Livewire::actingAs($user)
         ->test('channel-list', ['workspace' => $workspace])
         ->assertSet('notifications.'.$channel->id, 0);
 });
@@ -205,7 +207,7 @@ test('channel members avatars are displayed', function () {
     $channel->members()->create(['user_id' => $user1->id]);
     $channel->members()->create(['user_id' => $user2->id]);
 
-    Volt::actingAs($user1)
+    Livewire::actingAs($user1)
         ->test('chat', ['workspace' => $workspace, 'channel' => $channel])
         ->assertSee('User One')
         ->assertSee('User Two');
@@ -224,7 +226,7 @@ test('message feed displays user avatars', function () {
         'content' => 'Test message',
     ]);
 
-    Volt::actingAs($user)
+    Livewire::actingAs($user)
         ->test('message-feed', ['channel' => $channel])
         ->assertSee('John Doe')
         ->assertSee('Test message');
@@ -244,7 +246,7 @@ test('joining a public channel creates a message', function () {
         'is_private' => false,
     ]);
 
-    Volt::actingAs($user)
+    Livewire::actingAs($user)
         ->test('chat', ['workspace' => $workspace, 'channel' => 'general'])
         ->call('joinChannel')
         ->assertDispatched('messageSent');
@@ -270,7 +272,7 @@ test('joining a public channel hides the join button', function () {
         'is_private' => false,
     ]);
 
-    Volt::actingAs($user)
+    Livewire::actingAs($user)
         ->test('chat', ['workspace' => $workspace, 'channel' => 'general'])
         ->assertSee('に参加しますか？')
         ->assertSee('チャンネルに参加する')
@@ -300,7 +302,7 @@ test('inviting a member to a private channel creates a message', function () {
     ]);
     $channel->members()->create(['user_id' => $owner->id]);
 
-    Volt::actingAs($owner)
+    Livewire::actingAs($owner)
         ->test('invite-member', ['channel' => $channel])
         ->set('selectedUserIds', [$invitee->id])
         ->call('invite')

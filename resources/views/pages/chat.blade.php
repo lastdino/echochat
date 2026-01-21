@@ -1,192 +1,3 @@
-<?php
-
-use EchoChat\Models\Channel;
-use EchoChat\Models\Workspace;
-use EchoChat\Services\AIModelService;
-use Illuminate\Support\Facades\Gate;
-use Livewire\Attributes\Url;
-use Livewire\Component;
-
-new class extends Component
-{
-    public Workspace $workspace;
-
-    public ?Channel $activeChannel = null;
-
-    #[Url(as: 'channel', except: '')]
-    public string $channel = '';
-
-    #[Url(as: 'message', except: '')]
-    public string $message = '';
-
-    public ?string $messageId = null;
-
-    public string $summary = '';
-
-    public bool $isSummarizing = false;
-
-    public string $search = '';
-
-    public bool $isSearching = false;
-
-    public ?float $lastActivityClickId = null;
-
-    public function mount(Workspace $workspace)
-    {
-        Gate::authorize('view', $workspace);
-
-        $this->workspace = $workspace;
-
-        if ($this->channel !== '') {
-            if (is_numeric($this->channel)) {
-                $this->activeChannel = $workspace->channels()->find($this->channel);
-            } else {
-                $this->activeChannel = $workspace->channels()->where('name', $this->channel)->first();
-            }
-        }
-
-        if (! $this->activeChannel) {
-            $this->activeChannel = $workspace->channels()->first();
-        }
-
-        if ($this->activeChannel) {
-            $this->activeChannel->load('members.user');
-        }
-
-        if ($this->message !== '') {
-            $this->messageId = $this->message;
-            $parentId = \EchoChat\Models\Message::find($this->message)?->parent_id;
-            $this->dispatch('scrollToMessage', messageId: $this->message, parentId: $parentId)->to('echochat::message-feed');
-        }
-    }
-
-    protected $listeners = [
-        'channelSelected' => 'selectChannel',
-        'channelUpdated' => '$refresh',
-        'memberAdded' => '$refresh',
-        'setActivityMessage' => 'setActivityMessage',
-    ];
-
-    public function getAncestorIds($messageId)
-    {
-        $ancestorIds = [];
-        $message = \EchoChat\Models\Message::find($messageId);
-
-        while ($message && $message->parent_id) {
-            $ancestorIds[] = $message->parent_id;
-            $message = $message->parent;
-        }
-
-        return array_reverse($ancestorIds);
-    }
-
-    public function setActivityMessage($messageId, $channelId = null, $clickId = null)
-    {
-        $messageId = (string) $messageId;
-        $channelId = $channelId ? (string) $channelId : (string) $this->channel;
-
-        if ($clickId && $this->lastActivityClickId && $clickId < $this->lastActivityClickId) {
-            return;
-        }
-
-        if ($clickId) {
-            $this->lastActivityClickId = $clickId;
-        }
-
-        $ancestorIds = [];
-        if ($messageId) {
-            $ancestorIds = $this->getAncestorIds($messageId);
-        }
-
-        $this->messageId = $messageId;
-        $this->channel = $channelId;
-        $this->message = $messageId;
-        $this->activeChannel = Channel::with('members.user')->find($channelId);
-        $this->summary = '';
-        $this->search = '';
-        $this->isSearching = false;
-
-        $this->dispatch('activity-message-set', messageId: $messageId, channelId: $channelId, ancestorIds: $ancestorIds);
-        $this->dispatch('channelSelected', channelId: $channelId);
-        $this->dispatch('scrollToMessage', messageId: $messageId, ancestorIds: $ancestorIds)->to('echochat::message-feed');
-    }
-
-    public function selectChannel($channelId)
-    {
-        $channelId = (string) $channelId;
-
-        if ($this->channel === $channelId && $this->message === '') {
-            $this->dispatch('channelSelected', channelId: $channelId);
-
-            return;
-        }
-
-        // チャンネル切り替え時は、最後のアクティビティクリックIDを更新して、
-        // 直前のアクティビティイベントが遅れて届いても無視されるようにする
-        $this->lastActivityClickId = now()->getTimestampMs();
-
-        $this->message = '';
-        $this->messageId = null;
-        $this->channel = $channelId;
-        $this->activeChannel = Channel::with('members.user')->find($channelId);
-        $this->summary = '';
-        $this->search = '';
-        $this->isSearching = false;
-
-        $this->dispatch('scrollToBottom');
-    }
-
-    public function updatedSearch()
-    {
-        $this->dispatch('searchMessages', search: $this->search)->to('echochat::message-feed');
-    }
-
-    public function toggleSearch()
-    {
-        $this->isSearching = ! $this->isSearching;
-        if (! $this->isSearching) {
-            $this->search = '';
-            $this->updatedSearch();
-        }
-    }
-
-    public function summarize(AIModelService $aiService)
-    {
-        if (! $this->activeChannel) {
-            return;
-        }
-
-        $this->isSummarizing = true;
-        $this->summary = '';
-
-        try {
-            $this->summary = $aiService->summarizeChannel($this->activeChannel);
-        } catch (\Exception $e) {
-            $this->summary = 'エラーが発生しました: '.$e->getMessage();
-        } finally {
-            $this->isSummarizing = false;
-        }
-    }
-
-    public function joinChannel()
-    {
-        if ($this->activeChannel && $this->activeChannel->canJoin(auth()->id())) {
-            $this->activeChannel->members()->create([
-                'user_id' => auth()->id(),
-            ]);
-
-            $this->activeChannel->messages()->create([
-                'user_id' => auth()->id(),
-                'content' => "# {$this->activeChannel->name} に参加しました",
-            ]);
-
-            $this->activeChannel->load('members.user');
-            $this->dispatch('channelCreated'); // サイドバーを更新するため
-            $this->dispatch('messageSent'); // メッセージフィードを更新するため
-        }
-    }
-}; ?>
-
 <div
     x-data="{ showSidebar: false }"
     class="flex h-[calc(100vh-theme(spacing.16))] lg:h-screen bg-white dark:bg-zinc-900 overflow-hidden -m-6 lg:-m-8 relative"
@@ -196,7 +7,7 @@ new class extends Component
         :class="{ 'translate-x-0': showSidebar, '-translate-x-full': !showSidebar }"
         class="fixed inset-y-0 left-0 z-40 w-64 bg-zinc-100 dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700 transition-transform duration-300 lg:relative lg:translate-x-0 lg:flex-shrink-0"
     >
-        <livewire:echochat::channel-list :workspace="$workspace" :activeChannel="$activeChannel" />
+        <livewire:echochat-channel-list :workspace="$workspace" :activeChannel="$activeChannel" />
     </div>
 
     <!-- Backdrop for mobile -->
@@ -306,7 +117,7 @@ new class extends Component
                 </div>
 
                 <flux:modal name="activity-feed" variant="flyout" class="md:w-[400px]">
-                    <livewire:echochat::activity-feed
+                    <livewire:echochat-activity-feed
                         :workspace="$workspace"
                         wire:key="activity-feed-{{ $workspace->id }}"
                     />
@@ -431,16 +242,16 @@ new class extends Component
                 >
                     <div class="flex-1"></div>
                     <div>
-                        <livewire:echochat::message-feed :channel="$activeChannel" wire:key="feed-{{ $activeChannel->id }}"/>
+                        <livewire:echochat-message-feed :channel="$activeChannel" wire:key="feed-{{ $activeChannel->id }}"/>
                     </div>
                 </div>
 
                 <div class="p-4">
                     @if($activeChannel->isMember(auth()->id()))
                         @if(config('echochat.flux_pro'))
-                            <livewire:echochat::message-input-pro :channel="$activeChannel" wire:key="input-pro-{{ $activeChannel->id }}"/>
+                            <livewire:echochat-message-input-pro :channel="$activeChannel" wire:key="input-pro-{{ $activeChannel->id }}"/>
                         @else
-                            <livewire:echochat::message-input :channel="$activeChannel" wire:key="input-{{ $activeChannel->id }}"/>
+                            <livewire:echochat-message-input :channel="$activeChannel" wire:key="input-{{ $activeChannel->id }}"/>
                         @endif
                     @elseif($activeChannel->canJoin(auth()->id()))
                         <div
@@ -463,13 +274,13 @@ new class extends Component
 
                 @if($activeChannel->is_private)
                     <flux:modal name="invite-member-modal" class="md:w-[500px]">
-                        <livewire:echochat::invite-member :channel="$activeChannel"/>
+                        <livewire:echochat-invite-member :channel="$activeChannel"/>
                     </flux:modal>
                 @endif
 
                 @can('update', $activeChannel)
                     <flux:modal name="edit-channel-modal" class="md:w-[500px]">
-                        <livewire:echochat::edit-channel :channel="$activeChannel" wire:key="edit-{{ $activeChannel->id }}"/>
+                        <livewire:echochat-edit-channel :channel="$activeChannel" wire:key="edit-{{ $activeChannel->id }}"/>
                     </flux:modal>
                 @endcan
             </div>

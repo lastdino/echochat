@@ -1,231 +1,4 @@
-<?php
-
-use EchoChat\Models\Channel;
-use EchoChat\Models\ChannelUser;
-use EchoChat\Models\Message;
-use EchoChat\Models\Workspace;
-use EchoChat\Support\Tables;
-use Livewire\Component;
-
-new class extends Component
-{
-    public Workspace $workspace;
-
-    public ?Channel $activeChannel = null;
-
-    public array $notifications = [];
-
-    protected $listeners = [
-        'channelCreated' => '$refresh',
-        'channelUpdated' => '$refresh',
-        'workspaceMemberAdded' => '$refresh',
-        'channelSelected' => 'handleChannelSelected',
-    ];
-
-    public function handleChannelSelected($channelId)
-    {
-        $this->activeChannel = Channel::find($channelId);
-    }
-
-    public function mount()
-    {
-        $this->loadNotifications();
-    }
-
-    public function loadNotifications()
-    {
-        $userId = auth()->id();
-
-        foreach ($this->workspace->channels as $channel) {
-            $lastRead = ChannelUser::where('channel_id', $channel->id)
-                ->where('user_id', $userId)
-                ->first();
-
-            $query = Message::where('channel_id', $channel->id);
-
-            if ($lastRead && $lastRead->last_read_at) {
-                $query->where('created_at', '>', $lastRead->last_read_at);
-            }
-
-            $count = $query->count();
-
-            if ($count > 0) {
-                $this->notifications[$channel->id] = $count;
-            }
-        }
-    }
-
-    public function getListeners()
-    {
-        return [
-            "echo-private:workspace.{$this->workspace->id},.EchoChat\\Events\\MessageSent" => 'handleIncomingMessage',
-            'channelCreated' => '$refresh',
-            'channelUpdated' => '$refresh',
-            'workspaceMemberAdded' => '$refresh',
-            'channelSelected' => 'handleChannelSelected',
-        ];
-    }
-
-    public function handleIncomingMessage($event)
-    {
-        if (! is_array($event) || ! isset($event['channel_id'])) {
-            return;
-        }
-
-        $channelId = $event['channel_id'];
-
-        if ($this->activeChannel && $this->activeChannel->id === $channelId) {
-            $this->updateLastRead($channelId);
-
-            return;
-        }
-
-        $this->notifications[$channelId] = ($this->notifications[$channelId] ?? 0) + 1;
-    }
-
-    public function openDirectMessage($userId)
-    {
-        $currentUserId = auth()->id();
-
-        // 既存のDMチャンネルを探す
-        $query = Channel::where('workspace_id', $this->workspace->id)
-            ->where('is_dm', true)
-            ->whereHas('members', function ($query) use ($currentUserId) {
-                $query->where('user_id', $currentUserId);
-            });
-
-        if ($userId === $currentUserId) {
-            // 自分自身とのDMの場合は、メンバー数が1であることを確認
-            $query->has('members', 1);
-        } else {
-            // 他者とのDMの場合は、相手も含まれていることを確認
-            $query->whereHas('members', function ($query) use ($userId) {
-                $query->where('user_id', $userId);
-            });
-        }
-
-        $channel = $query->first();
-
-        if (! $channel) {
-            // 新規作成
-            $channel = Channel::create([
-                'workspace_id' => $this->workspace->id,
-                'is_dm' => true,
-                'is_private' => true,
-                'creator_id' => $currentUserId,
-            ]);
-
-            $channel->members()->create(['user_id' => $currentUserId]);
-
-            if ($userId !== $currentUserId) {
-                $channel->members()->create(['user_id' => $userId]);
-            }
-        }
-
-        $this->selectChannel($channel->id);
-    }
-
-    public function selectChannel($channelId)
-    {
-        $this->updateLastRead($channelId);
-        $this->notifications[$channelId] = 0;
-        $this->activeChannel = Channel::find($channelId);
-        $this->dispatch('channelSelected', $channelId)->to('echochat::chat');
-    }
-
-    protected function updateLastRead($channelId)
-    {
-        ChannelUser::updateOrCreate(
-            ['channel_id' => $channelId, 'user_id' => auth()->id()],
-            ['last_read_at' => now()]
-        );
-
-        $channel = Channel::find($channelId);
-        if ($channel) {
-            broadcast(new \EchoChat\Events\ChannelRead($channel, auth()->id()))->toOthers();
-            $this->dispatch('channelRead', channelId: $channelId);
-        }
-    }
-
-    public function removeMember($userId)
-    {
-        $this->authorize('removeMember', $this->workspace);
-
-        // チャンネルからも削除
-        $channelIds = $this->workspace->channels()->pluck('id');
-        \EchoChat\Models\ChannelMember::whereIn('channel_id', $channelIds)
-            ->where('user_id', $userId)
-            ->delete();
-
-        $this->workspace->members()->detach($userId);
-
-        $this->dispatch('workspaceMemberAdded'); // メンバーリスト更新のために同じイベントを使う
-    }
-
-    public function transferOwnership($userId)
-    {
-        $this->authorize('transferOwnership', $this->workspace);
-
-        $oldOwnerId = $this->workspace->owner_id;
-
-        // オーナーを変更
-        $this->workspace->update([
-            'owner_id' => $userId,
-        ]);
-
-        // 元のオーナーをメンバーとして追加
-        if (! $this->workspace->members()->where('user_id', $oldOwnerId)->exists()) {
-            $this->workspace->members()->attach($oldOwnerId);
-        }
-
-        // 新しいオーナーがメンバーリストにいた場合は削除（オーナーはmembersテーブルには含めない設計の場合）
-        // Workspace.php を見ると members() は belongsToMany(User::class, Tables::name('workspace_members'))
-        // 既存のコードがオーナーをmembersに含めているかどうかを確認する必要がある。
-        // 一般的にはオーナーは別管理だが、このアプリではどうなっているか。
-
-        $this->workspace->members()->detach($userId);
-
-        $this->dispatch('workspaceMemberAdded');
-    }
-
-    public function deleteChannel($channelId)
-    {
-        $channel = Channel::findOrFail($channelId);
-
-        $this->authorize('delete', $channel);
-
-        // デフォルトのチャンネルなどは削除できないようにするなどのバリデーションが必要かもしれないが、
-        // 現時点ではシンプルに削除。
-
-        $channel->delete();
-
-        if ($this->activeChannel && $this->activeChannel->id === (int) $channelId) {
-            $this->activeChannel = null;
-            $this->dispatch('channelSelected', null)->to('echochat::chat');
-        }
-
-        $this->dispatch('channelCreated'); // リスト再描画のために使用
-    }
-
-    public function updateOrder(array $items)
-    {
-        $userId = auth()->id();
-
-        foreach ($items as $item) {
-            if (! is_array($item) || ! isset($item['value']) || ! isset($item['order'])) {
-                continue;
-            }
-
-            ChannelUser::updateOrCreate(
-                ['channel_id' => $item['value'], 'user_id' => $userId],
-                ['sort_order' => $item['order']]
-            );
-        }
-
-        $this->dispatch('channelUpdated');
-    }
-}; ?>
-
+@use('EchoChat\Support\Tables')
 <div class="flex flex-col h-full relative" x-ref="sidebar" x-data="{
     open: false,
     x: 0,
@@ -288,7 +61,7 @@ new class extends Component
                 <div >
                     @foreach($publicChannels as $channel)
                         <div class="group/channel relative" >
-                            <x-echochat::nav-item-with-badge
+                            <x-echochat-nav-item-with-badge
                                 wire:click="selectChannel({{ $channel->id }})"
                                 @contextmenu.prevent="let rect = $refs.sidebar.getBoundingClientRect(); open = true; x = $event.clientX - rect.left; y = $event.clientY - rect.top; type = 'channel'; channelId = {{ $channel->id }}; channelName = '{{ $channel->name }}'; canDelete = {{ Gate::check('delete', $channel) ? 'true' : 'false' }}"
                                 :current="$activeChannel && $activeChannel->id === $channel->id"
@@ -297,7 +70,7 @@ new class extends Component
                                 :icon="$channel->displayIcon"
                             >
                                 {{ $channel->displayName }}
-                            </x-echochat::nav-item-with-badge>
+                            </x-echochat-nav-item-with-badge>
                         </div>
                     @endforeach
                 </div>
@@ -315,7 +88,7 @@ new class extends Component
                 <div >
                     @foreach($privateChannels as $channel)
                         <div class="group/channel relative" >
-                            <x-echochat::nav-item-with-badge
+                            <x-echochat-nav-item-with-badge
                                 wire:click="selectChannel({{ $channel->id }})"
                                 @contextmenu.prevent="let rect = $refs.sidebar.getBoundingClientRect(); open = true; x = $event.clientX - rect.left; y = $event.clientY - rect.top; type = 'channel'; channelId = {{ $channel->id }}; channelName = '{{ $channel->name }}'; canDelete = {{ Gate::check('delete', $channel) ? 'true' : 'false' }}"
                                 :current="$activeChannel && $activeChannel->id === $channel->id"
@@ -324,7 +97,7 @@ new class extends Component
                                 :icon="$channel->displayIcon"
                             >
                                 {{ $channel->displayName }}
-                            </x-echochat::nav-item-with-badge>
+                            </x-echochat-nav-item-with-badge>
                         </div>
                     @endforeach
                 </div>
@@ -344,7 +117,7 @@ new class extends Component
 
                     $ownerDmChannel = $ownerDmChannel->first();
                 @endphp
-                <x-echochat::nav-item-with-badge
+                <x-echochat-nav-item-with-badge
                     wire:key="member-owner-{{ $workspace->owner->id }}"
                     wire:click="openDirectMessage({{ $workspace->owner->id }})"
                     :current="$activeChannel && $ownerDmChannel && $activeChannel->id === $ownerDmChannel->id"
@@ -362,7 +135,7 @@ new class extends Component
                             <span class="text-zinc-500 dark:text-zinc-400 shrink-0">(自分)</span>
                         @endif
                     </div>
-                </x-echochat::nav-item-with-badge>
+                </x-echochat-nav-item-with-badge>
 
                 @foreach($workspace->members as $member)
                     @php
@@ -380,7 +153,7 @@ new class extends Component
                         $memberName = \EchoChat\Support\UserSupport::getName($member);
                     @endphp
                         @can('removeMember', $workspace)
-                            <x-echochat::nav-item-with-badge
+                            <x-echochat-nav-item-with-badge
                                 wire:key="member-{{ $member->id }}"
                                 wire:click="openDirectMessage({{ $member->id }})"
                                 @contextmenu.prevent="let rect = $refs.sidebar.getBoundingClientRect(); open = true; x = $event.clientX - rect.left; y = $event.clientY - rect.top; type = 'member'; memberId = {{ $member->id }}; memberName = '{{ $memberName }}'"
@@ -393,9 +166,9 @@ new class extends Component
                                 </x-slot>
 
                                 {{ $memberName }} {{ $member->id === auth()->id() ? '(自分)' : '' }}
-                            </x-echochat::nav-item-with-badge>
+                            </x-echochat-nav-item-with-badge>
                         @else
-                            <x-echochat::nav-item-with-badge
+                            <x-echochat-nav-item-with-badge
                                 wire:key="member-{{ $member->id }}"
                                 wire:click="openDirectMessage({{ $member->id }})"
                                 :current="$activeChannel && $memberDmChannel && $activeChannel->id === $memberDmChannel->id"
@@ -407,7 +180,7 @@ new class extends Component
                                 </x-slot>
 
                                 {{ $memberName }} {{ $member->id === auth()->id() ? '(自分)' : '' }}
-                            </x-echochat::nav-item-with-badge>
+                            </x-echochat-nav-item-with-badge>
                         @endcan
                     @endforeach
 
@@ -425,11 +198,11 @@ new class extends Component
     </div>
 
     <flux:modal name="create-channel-modal" class="md:w-[500px]">
-        <livewire:echochat::create-channel :workspace="$workspace" />
+        <livewire:echochat-create-channel :workspace="$workspace" />
     </flux:modal>
 
     <flux:modal name="invite-workspace-member-modal" class="md:w-[500px]">
-        <livewire:echochat::invite-workspace-member :workspace="$workspace" />
+        <livewire:echochat-invite-workspace-member :workspace="$workspace" />
     </flux:modal>
 
     {{-- Context Menu --}}
