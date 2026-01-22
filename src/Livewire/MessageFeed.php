@@ -123,7 +123,7 @@ class MessageFeed extends Component
         if ($content === strip_tags($content)) {
             // タグが含まれていない場合は通常通りエスケープと改行処理
             $escaped = e($content);
-            $withBreaks = nl2br($escaped);
+            $withBreaks = $escaped;
         } else {
             // HTMLタグが含まれている場合は、許可されたタグ以外を除去（XSS対策）
             // 許可するタグ: <b>, <i>, <u>, <s>, <a>, <ul>, <ol>, <li>, <code>, <pre>, <br>, <p>, <h1>, <h2>, <h3>
