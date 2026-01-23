@@ -97,4 +97,20 @@ class Channel extends Model
 
         return $this->is_private ? 'lock-closed' : 'hashtag';
     }
+
+    public function getUnreadCountAttribute(): int
+    {
+        $lastRead = ChannelUser::where('channel_id', $this->id)
+            ->where('user_id', auth()->id())
+            ->first()
+            ?->last_read_at;
+
+        $query = $this->messages()->where('user_id', '!=', auth()->id());
+
+        if ($lastRead) {
+            $query->where('created_at', '>', $lastRead);
+        }
+
+        return $query->count();
+    }
 }

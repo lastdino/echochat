@@ -95,7 +95,7 @@
                                     @if($activity['type'] === 'mention')
                                         あなたをメンションしました
                                     @elseif($activity['type'] === 'reply')
-                                        あなたのメッセージに返信しました
+                                        スレッドに返信しました
                                     @elseif($activity['type'] === 'dm')
                                         ダイレクトメッセージを送信しました
                                     @endif
@@ -120,7 +120,7 @@
                                 </div>
                             </div>
 
-                            @if($activity['type'] === 'mention' && !$activity['is_read'])
+                            @if(($activity['type'] === 'mention' || $activity['type'] === 'reply') && !$activity['is_read'])
                                 <div class="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-1.5" title="未読"></div>
                             @endif
                         </div>

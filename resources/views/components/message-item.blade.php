@@ -25,15 +25,17 @@
         <div class="flex items-baseline gap-2">
             <span class="font-bold dark:text-white">{{ $userName }}</span>
             <span class="text-xs text-zinc-500">{{ $message->created_at->format('H:i') }}</span>
-            <button
-                type="button"
-                wire:click="replyTo({{ $message->id }})"
-                class="hidden group-hover/message:inline-flex items-center text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors ml-2"
-                title="返信"
-            >
-                <flux:icon icon="arrow-uturn-left" class="w-3 h-3 mr-1" />
-                返信
-            </button>
+            @if(! $isReply)
+                <button
+                    type="button"
+                    @click="$dispatch('openThread', { messageId: {{ $message->parent_id ?: $message->id }} })"
+                    class="hidden group-hover/message:inline-flex items-center text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors ml-2"
+                    title="スレッドで返信"
+                >
+                    <flux:icon icon="chat-bubble-left-right" class="w-3 h-3 mr-1" />
+                    返信
+                </button>
+            @endif
         </div>
         @if($message->content)
             <div class="text-zinc-700 dark:text-zinc-300 break-words whitespace-pre-wrap">{!! $this->formatContent($message->content) !!}</div>
@@ -92,7 +94,9 @@
                         navigator.clipboard.writeText(content);
                     }
                 }">
-                    <flux:menu.item icon="arrow-uturn-left" wire:click="replyTo({{ $message->id }})">返信</flux:menu.item>
+                    @if(! $isReply)
+                        <flux:menu.item icon="chat-bubble-left-right" @click="$dispatch('openThread', { messageId: {{ $message->parent_id ?: $message->id }} })">スレッドで返信</flux:menu.item>
+                    @endif
                     <flux:menu.item icon="document-duplicate" @click="copy({{ Js::from($message->content) }})">コピー</flux:menu.item>
                 </flux:menu>
             </flux:dropdown>
@@ -140,7 +144,7 @@
                 $lastReply = $message->replies->sortByDesc('created_at')->first();
                 $replyUsers = $message->replies->map(fn($r) => $r->user)->unique('id')->take(3);
             @endphp
-            <div x-show="! showReplies" class="mt-2 flex items-center gap-2">
+            <div class="mt-2 flex items-center gap-2">
                 <div class="flex -space-x-2">
                     @foreach($replyUsers as $replyUser)
                         <flux:avatar size="xs" :name="\EchoChat\Support\UserSupport::getName($replyUser)" src="{{ $replyUser->getUserAvatar() }}" class="ring-2 ring-white dark:ring-zinc-900" />
@@ -148,37 +152,12 @@
                 </div>
                 <button
                     type="button"
-                    @click="showReplies = true"
+                    @click="$dispatch('openThread', { messageId: {{ $message->id }} })"
                     class="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline transition-colors flex items-center gap-2"
                 >
                     {{ $replyCount }} 件の返信
                     <span class="font-normal text-zinc-500 dark:text-zinc-400">最終返信: {{ $lastReply->created_at->diffForHumans() }}</span>
                 </button>
-            </div>
-        @endif
-
-        {{-- 返信の再帰表示 --}}
-        @if(empty($search) && $message->replies->isNotEmpty())
-            <div
-                x-show="showReplies || {{ $isReply ? 'true' : 'false' }}"
-                class="mt-3 space-y-3 pl-4 border-l-2 border-zinc-100 dark:border-zinc-800"
-            >
-                @foreach($message->replies as $reply)
-                    <x-echochat-message-item :message="$reply" :is-reply="true" />
-                @endforeach
-
-                @if(! $isReply)
-                    <div class="pt-2">
-                        <button
-                            type="button"
-                            @click="showReplies = false"
-                            class="text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1 transition-colors"
-                        >
-                            <flux:icon icon="chevron-up" class="w-3 h-3" />
-                            返信を閉じる
-                        </button>
-                    </div>
-                @endif
             </div>
         @endif
     </div>

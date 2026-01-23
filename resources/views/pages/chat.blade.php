@@ -1,5 +1,35 @@
 <div
-    x-data="{ showSidebar: false }"
+    x-data="{
+        showSidebar: false,
+        threadWidth: $persist(384).as('echochat_thread_width'),
+        isResizing: false,
+        showReopenButton: false,
+        startWidth: 0,
+        startX: 0,
+        startResize(e) {
+            this.isResizing = true;
+            this.startWidth = this.threadWidth;
+            this.startX = e.clientX;
+            document.addEventListener('mousemove', this.handleMouseMove.bind(this));
+            document.addEventListener('mouseup', this.stopResize.bind(this));
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        },
+        handleMouseMove(e) {
+            if (!this.isResizing) return;
+            const delta = this.startX - e.clientX;
+            const newWidth = Math.min(Math.max(this.startWidth + delta, 300), 800);
+            this.threadWidth = newWidth;
+        },
+        stopResize() {
+            this.isResizing = false;
+            document.removeEventListener('mousemove', this.handleMouseMove);
+            document.removeEventListener('mouseup', this.stopResize);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        }
+    }"
+    x-on:thread-opened.window="showReopenButton = false"
     class="flex h-[calc(100vh-theme(spacing.16))] lg:h-screen bg-white dark:bg-zinc-900 overflow-hidden -m-6 lg:-m-8 relative"
 >
     <!-- Sidebar -->
@@ -25,8 +55,9 @@
     ></div>
 
     <!-- Main Chat Area -->
-    <div class="flex-1 flex flex-col min-w-0">
-        @if($activeChannel)
+    <div class="flex-1 flex min-w-0">
+        <div class="flex-1 flex flex-col min-w-0">
+            @if($activeChannel)
             <div class="flex-1 flex flex-col overflow-hidden" wire:key="active-channel-{{ $activeChannel->id }}">
                 <div class="p-4 border-b border-zinc-200 dark:border-zinc-700 flex justify-between items-center">
                     <div class="flex items-center gap-3 min-w-0">
@@ -81,6 +112,12 @@
 
                             <flux:button wire:click="summarize" variant="subtle" size="sm" icon="sparkles" square title="AIで要約" />
 
+                            <flux:button wire:click="extractImportantInfo" variant="subtle" size="sm" icon="user-circle" square title="自分宛ての重要情報を抽出" />
+
+                            <flux:modal.trigger name="thread-list">
+                                <flux:button variant="subtle" size="sm" icon="chat-bubble-left-right" square title="スレッド一覧" />
+                            </flux:modal.trigger>
+
                             <flux:modal.trigger name="activity-feed">
                                 <div class="relative">
                                     <flux:button variant="subtle" size="sm" icon="bell" square title="アクティビティ" />
@@ -98,6 +135,10 @@
                     @else
                         <div class="flex items-center gap-2">
                             <flux:button wire:click="toggleSearch" variant="subtle" size="sm" icon="magnifying-glass" square title="検索" :class="$isSearching ? 'text-blue-600' : ''" />
+
+                            <flux:modal.trigger name="thread-list">
+                                <flux:button variant="subtle" size="sm" icon="chat-bubble-left-right" square title="スレッド一覧" />
+                            </flux:modal.trigger>
 
                             <flux:modal.trigger name="activity-feed">
                                 <div class="relative">
@@ -120,6 +161,14 @@
                     <livewire:echochat-activity-feed
                         :workspace="$workspace"
                         wire:key="activity-feed-{{ $workspace->id }}"
+                    />
+                </flux:modal>
+
+                <flux:modal name="thread-list" variant="flyout" class="md:w-[400px]">
+                    <livewire:echochat-thread-list
+                        :workspace="$workspace"
+                        :channel="$activeChannel"
+                        wire:key="thread-list-{{ $workspace->id }}-{{ $activeChannel?->id }}"
                     />
                 </flux:modal>
 
@@ -157,6 +206,32 @@
                         <div class="flex items-center gap-2 text-zinc-500 text-sm italic">
                             <flux:icon icon="sparkles" class="w-4 h-4 animate-pulse" />
                             要約を作成中...
+                        </div>
+                    </div>
+                @endif
+
+                @if($importantInfo)
+                    <div class="px-4 py-2 bg-indigo-50 dark:bg-indigo-950 border-b border-indigo-100 dark:border-indigo-900">
+                        <div class="flex items-start gap-2">
+                            <flux:icon icon="user-circle" class="w-4 h-4 text-indigo-500 mt-1 shrink-0" />
+                            <div class="flex-1">
+                                <h4 class="text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-1 flex justify-between">
+                                    あなた宛ての重要情報
+                                    <button wire:click="$set('importantInfo', '')" class="text-zinc-400 hover:text-zinc-600">
+                                        <flux:icon icon="x-mark" class="w-3 h-3" />
+                                    </button>
+                                </h4>
+                                <div class="text-sm text-indigo-900 dark:text-indigo-100 whitespace-pre-wrap">{!! \Illuminate\Support\Str::markdown($importantInfo) !!}</div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                @if($isExtracting)
+                    <div class="px-4 py-2 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700">
+                        <div class="flex items-center gap-2 text-zinc-500 text-sm italic">
+                            <flux:icon icon="user-circle" class="w-4 h-4 animate-pulse" />
+                            重要情報を抽出中...
                         </div>
                     </div>
                 @endif
@@ -248,11 +323,7 @@
 
                 <div class="p-4">
                     @if($activeChannel->isMember(auth()->id()))
-                        @if(config('echochat.flux_pro'))
-                            <livewire:echochat-message-input-pro :channel="$activeChannel" wire:key="input-pro-{{ $activeChannel->id }}"/>
-                        @else
-                            <livewire:echochat-message-input :channel="$activeChannel" wire:key="input-{{ $activeChannel->id }}"/>
-                        @endif
+                        <livewire:echochat-message-input :channel="$activeChannel" wire:key="input-{{ $activeChannel->id }}"/>
                     @elseif($activeChannel->canJoin(auth()->id()))
                         <div
                             wire:key="join-{{ $activeChannel->id }}"
@@ -290,4 +361,74 @@
             </div>
         @endif
     </div>
+</div>
+
+    <!-- Thread Sidebar -->
+    @if($threadParentMessageId)
+        <div
+            @mousedown="startResize"
+            class="relative w-1 hover:w-1.5 bg-zinc-200 dark:bg-zinc-700 cursor-col-resize z-10 hover:bg-blue-400 dark:hover:bg-blue-600 transition-all group/resizer"
+        >
+            <div class="absolute inset-y-0 -left-1 -right-1 cursor-col-resize group-hover/resizer:bg-blue-400/20"></div>
+        </div>
+
+        <div
+            :style="`width: ${threadWidth}px`"
+            class="bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-700 flex flex-col h-full"
+            wire:key="thread-sidebar"
+        >
+            <div class="p-4 border-b border-zinc-200 dark:border-zinc-700 flex justify-between items-center">
+                <h3 class="font-bold dark:text-white">スレッド</h3>
+                <button wire:click="closeThread" class="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">
+                    <flux:icon icon="x-mark" variant="mini" />
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4">
+                @php
+                    $parentMessage = \EchoChat\Models\Message::with(['user', 'media', 'reactions.user', 'replies.user', 'replies.media', 'replies.reactions.user'])->find($threadParentMessageId);
+                @endphp
+                @if($parentMessage)
+                    <div class="mb-6 pb-6 border-b border-zinc-100 dark:border-zinc-800">
+                        <x-echochat-message-item :message="$parentMessage" />
+                    </div>
+                    <div class="space-y-6">
+                        @foreach($parentMessage->replies as $reply)
+                            <x-echochat-message-item :message="$reply" :is-reply="true" />
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+            <div class="p-4 border-t border-zinc-200 dark:border-zinc-700">
+                @if(config('echochat.flux_pro'))
+                    <livewire:echochat-message-input-pro :channel="$activeChannel" :reply-to-id="$threadParentMessageId" wire:key="thread-input-pro-{{ $threadParentMessageId }}"/>
+                @else
+                    <livewire:echochat-message-input :channel="$activeChannel" :reply-to-id="$threadParentMessageId" wire:key="thread-input-{{ $threadParentMessageId }}"/>
+                @endif
+            </div>
+        </div>
+    @endif
+
+    <!-- Reopen Thread Button Area -->
+    @if(!$threadParentMessageId && $lastThreadParentMessageId)
+        <div
+            class="fixed inset-y-0 right-0 w-4 z-20 group/reopen flex items-center justify-center"
+            @mouseenter="showReopenButton = true"
+            @mouseleave="showReopenButton = false"
+        >
+            <button
+                x-show="showReopenButton"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 translate-x-4"
+                x-transition:enter-end="opacity-100 translate-x-0"
+                x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="opacity-100 translate-x-0"
+                x-transition:leave-end="opacity-0 translate-x-4"
+                wire:click="openThread({{ $lastThreadParentMessageId }})"
+                class="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-lg rounded-l-lg p-2 mr-0 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors group"
+                title="スレッドを再表示"
+            >
+                <flux:icon icon="chat-bubble-left-right" variant="mini" class="text-zinc-500 group-hover:text-blue-500" />
+            </button>
+        </div>
+    @endif
 </div>

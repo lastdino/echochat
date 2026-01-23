@@ -5,7 +5,6 @@ namespace EchoChat\Livewire;
 use EchoChat\Models\Channel;
 use EchoChat\Models\Message;
 use EchoChat\Models\MessageReaction;
-use EchoChat\Support\UserSupport;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -15,12 +14,24 @@ class MessageFeed extends Component
 
     public string $search = '';
 
+    public ?string $lastReadAt = null;
+
+    public function mount(Channel $channel): void
+    {
+        $this->channel = $channel;
+        $this->lastReadAt = \EchoChat\Models\ChannelUser::where('channel_id', $channel->id)
+            ->where('user_id', auth()->id())
+            ->first()
+            ?->last_read_at
+            ?->toDateTimeString();
+    }
+
     public function getListeners(): array
     {
         return [
-            "echo-private:workspace.{$this->channel->workspace_id}.channel.{$this->channel->id},.EchoChat\\Events\\MessageSent" => 'handleMessageSent',
+            "echo-private:workspace.{$this->channel->workspace_id}.channel.{$this->channel->id},.EchoChat\\Events\\MessageSent" => 'handleIncomingMessage',
             "echo-private:workspace.{$this->channel->workspace_id}.channel.{$this->channel->id},.EchoChat\\Events\\ReactionUpdated" => '$refresh',
-            'messageSent' => 'handleMessageSent',
+            'messageSent' => 'handleIncomingMessage',
             'searchMessages' => 'updateSearch',
             'scrollToMessage' => 'scrollToMessage',
         ];
@@ -31,9 +42,10 @@ class MessageFeed extends Component
         $this->dispatch('message-target-scrolled', messageId: $messageId, ancestorIds: $ancestorIds);
     }
 
-    public function handleMessageSent(): void
+    public function handleIncomingMessage(): void
     {
-        $this->dispatch('message-sent')->to(Chat::class);
+        // 自身の状態を更新するために必要なら $refresh
+        $this->dispatch('$refresh');
     }
 
     public function updateSearch(string $search): void
@@ -44,7 +56,7 @@ class MessageFeed extends Component
     public function render(): View
     {
         $query = $this->channel->messages()
-            ->with(['user', 'media', 'parent.user', 'reactions.user', 'replies.user', 'replies.media', 'replies.reactions.user', 'replies.replies'])
+            ->with(['user', 'media', 'parent.user', 'reactions.user', 'replies.user'])
             ->oldest();
 
         if (trim($this->search) !== '') {
@@ -67,12 +79,17 @@ class MessageFeed extends Component
 
         return view('echochat::pages.message-feed', [
             'groupedMessages' => $groupedMessages,
+            'lastReadAtDate' => $this->lastReadAt ? \Carbon\Carbon::parse($this->lastReadAt) : null,
         ]);
     }
 
     public function replyTo(int $messageId): void
     {
-        $this->dispatch('setReplyTo', messageId: $messageId);
+        $message = Message::find($messageId);
+        if ($message) {
+            $parentId = $message->parent_id ?: $message->id;
+            $this->dispatch('openThread', messageId: $parentId)->to(Chat::class);
+        }
     }
 
     public function deleteAttachment(int $messageId, int $mediaId): void
@@ -119,56 +136,6 @@ class MessageFeed extends Component
 
     public function formatContent(string $content): string
     {
-        // HTMLタグが含まれているかチェック
-        if ($content === strip_tags($content)) {
-            // タグが含まれていない場合は通常通りエスケープと改行処理
-            $escaped = e($content);
-            $withBreaks = $escaped;
-        } else {
-            // HTMLタグが含まれている場合は、許可されたタグ以外を除去（XSS対策）
-            // 許可するタグ: <b>, <i>, <u>, <s>, <a>, <ul>, <ol>, <li>, <code>, <pre>, <br>, <p>, <h1>, <h2>, <h3>
-            $allowedTags = '<b><i><u><s><a><ul><ol><li><code><pre><br><p><h1><h2><h3>';
-            $sanitized = strip_tags($content, $allowedTags);
-
-            // 属性の除去（javascript: 等の除去のため、簡易的な処理）
-            // より厳格な対策が必要な場合は HTML Purifier などの導入を推奨
-            $sanitized = preg_replace('/on\w+="[^"]*"/i', '', $sanitized);
-            $sanitized = preg_replace('/href="javascript:[^"]*"/i', 'href="#"', $sanitized);
-
-            $withBreaks = $sanitized;
-        }
-
-        // @channel のハイライト
-        $replacements = [];
-        if (str_contains($withBreaks, '@channel')) {
-            $placeholder = '___MENTION_CHANNEL___';
-            $withBreaks = str_replace('@channel', $placeholder, $withBreaks);
-            $replacements[$placeholder] = '<span class="bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-1 rounded font-medium">@channel</span>';
-        }
-
-        // メンションをハイライト
-        // チャンネルメンバーの名前リストを取得（長い順にソートして部分一致を防ぐ）
-        $names = $this->channel->members()
-            ->with('user')
-            ->get()
-            ->map(fn ($m) => UserSupport::getName($m->user))
-            ->filter()
-            ->unique()
-            ->sortByDesc(fn ($name) => strlen($name));
-
-        foreach ($names as $name) {
-            $mention = '@'.e($name);
-            $replacement = '___MENTION_'.md5($name).'___';
-            $withBreaks = str_replace($mention, $replacement, $withBreaks);
-            $replacements[$replacement] = '<span class="bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-1 rounded font-medium">'.$mention.'</span>';
-        }
-
-        if (count($replacements) > 0) {
-            foreach ($replacements as $placeholder => $html) {
-                $withBreaks = str_replace($placeholder, $html, $withBreaks);
-            }
-        }
-
-        return $withBreaks;
+        return \EchoChat\Support\MessageSupport::formatContent($content, $this->channel);
     }
 }

@@ -30,6 +30,28 @@ class AIModelService
         return $this->callAI($prompt);
     }
 
+    public function extractImportantInfo(Channel $channel, string $userName, ?int $limit = null): string
+    {
+        $limit = $limit ?? config('echochat.ai.message_limit', 50);
+
+        $messages = $channel->messages()
+            ->with('user')
+            ->latest()
+            ->limit($limit)
+            ->get()
+            ->reverse();
+
+        if ($messages->isEmpty()) {
+            return 'メッセージがありません。';
+        }
+
+        $formattedMessages = $messages->map(fn ($m) => "{$m->user->name}: ".trim(preg_replace('/\s+/', ' ', strip_tags(str_replace('<', ' <', $m->content)))))->join("\n");
+
+        $prompt = "以下のチャット履歴から、{$userName} 宛ての重要な依頼、質問、または {$userName} が確認すべき重要情報を抽出し、簡潔な箇条書きの日本語でまとめてください。関連する情報がない場合は「特に関連する重要な情報はありません」と回答してください。\n\nチャット履歴:\n{$formattedMessages}";
+
+        return $this->callAI($prompt);
+    }
+
     protected function callAI(string $prompt): string
     {
         $driver = config('echochat.ai.driver', 'gemini');

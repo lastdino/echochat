@@ -28,9 +28,20 @@ class Chat extends Component
 
     public bool $isSummarizing = false;
 
+    public string $importantInfo = '';
+
+    public bool $isExtracting = false;
+
     public string $search = '';
 
     public bool $isSearching = false;
+
+    #[Url(as: 'thread', except: '')]
+    public string $thread = '';
+
+    public ?int $threadParentMessageId = null;
+
+    public ?int $lastThreadParentMessageId = null;
 
     public ?float $lastActivityClickId = null;
 
@@ -58,17 +69,79 @@ class Chat extends Component
 
         if ($this->message !== '') {
             $this->messageId = $this->message;
-            $parentId = \EchoChat\Models\Message::find($this->message)?->parent_id;
+            $message = \EchoChat\Models\Message::find($this->message);
+            $parentId = $message?->parent_id;
+
+            if ($parentId) {
+                $this->threadParentMessageId = $parentId;
+                $this->thread = (string) $parentId;
+                $this->lastThreadParentMessageId = $parentId;
+            }
+
             $this->dispatch('scrollToMessage', messageId: $this->message, parentId: $parentId)->to('echochat-message-feed');
+        } elseif ($this->thread !== '') {
+            $this->threadParentMessageId = (int) $this->thread;
+            $this->lastThreadParentMessageId = (int) $this->thread;
         }
     }
 
-    protected $listeners = [
-        'channelSelected' => 'selectChannel',
-        'channelUpdated' => '$refresh',
-        'memberAdded' => '$refresh',
-        'setActivityMessage' => 'setActivityMessage',
-    ];
+    public function getListeners(): array
+    {
+        $listeners = [
+            'channelSelected' => 'selectChannel',
+            'channelUpdated' => '$refresh',
+            'memberAdded' => '$refresh',
+            'setActivityMessage' => 'setActivityMessage',
+            'openThread' => 'openThread',
+            'closeThread' => 'closeThread',
+        ];
+
+        if ($this->activeChannel) {
+            $listeners["echo-private:workspace.{$this->workspace->id}.channel.{$this->activeChannel->id},.EchoChat\\Events\\MessageSent"] = 'handleMessageSent';
+        }
+
+        return $listeners;
+    }
+
+    public function handleMessageSent($event = null): void
+    {
+        // MessageFeed コンポーネントに通知して、メッセージ一覧を更新させる
+        $this->dispatch('messageSent')->to(MessageFeed::class);
+    }
+
+    public function openThread($messageId): void
+    {
+        if (is_array($messageId) && isset($messageId['messageId'])) {
+            $messageId = $messageId['messageId'];
+        }
+
+        if (! $messageId) {
+            return;
+        }
+
+        $message = \EchoChat\Models\Message::find($messageId);
+        if ($message && $message->parent_id) {
+            $this->threadParentMessageId = $message->parent_id;
+        } else {
+            $this->threadParentMessageId = $messageId;
+        }
+        $this->thread = (string) $this->threadParentMessageId;
+        $this->lastThreadParentMessageId = $this->threadParentMessageId;
+        $this->dispatch('thread-opened');
+        // スレッドを開くときは検索やサマリーを閉じるなどの調整が必要な場合がある
+    }
+
+    public function closeThread(): void
+    {
+        $this->lastThreadParentMessageId = $this->threadParentMessageId;
+        $this->threadParentMessageId = null;
+        $this->thread = '';
+    }
+
+    public function formatContent(string $content): string
+    {
+        return \EchoChat\Support\MessageSupport::formatContent($content, $this->activeChannel);
+    }
 
     public function getAncestorIds($messageId): array
     {
@@ -109,6 +182,16 @@ class Chat extends Component
         $this->search = '';
         $this->isSearching = false;
 
+        $message = \EchoChat\Models\Message::find($messageId);
+        if ($message && $message->parent_id) {
+            $this->threadParentMessageId = $message->parent_id;
+            $this->thread = (string) $message->parent_id;
+            $this->lastThreadParentMessageId = $message->parent_id;
+        } else {
+            $this->threadParentMessageId = null;
+            $this->thread = '';
+        }
+
         $this->dispatch('activity-message-set', messageId: $messageId, channelId: $channelId, ancestorIds: $ancestorIds);
         $this->dispatch('channelSelected', channelId: $channelId);
         $this->dispatch('scrollToMessage', messageId: $messageId, ancestorIds: $ancestorIds)->to('echochat-message-feed');
@@ -117,6 +200,11 @@ class Chat extends Component
     public function selectChannel($channelId): void
     {
         $channelId = (string) $channelId;
+
+        $this->isSummarizing = false;
+        $this->summary = '';
+        $this->isExtracting = false;
+        $this->importantInfo = '';
 
         if ($this->channel === $channelId && $this->message === '') {
             $this->dispatch('channelSelected', channelId: $channelId);
@@ -127,6 +215,12 @@ class Chat extends Component
         // チャンネル切り替え時は、最後のアクティビティクリックIDを更新して、
         // 直前のアクティビティイベントが遅れて届いても無視されるようにする
         $this->lastActivityClickId = now()->getTimestampMs();
+
+        // チャンネルが変わった場合のみスレッドを閉じる
+        if ($this->channel !== $channelId) {
+            $this->threadParentMessageId = null;
+            $this->thread = '';
+        }
 
         $this->message = '';
         $this->messageId = null;
@@ -159,6 +253,7 @@ class Chat extends Component
             return;
         }
 
+        $this->importantInfo = '';
         $this->isSummarizing = true;
         $this->summary = '';
 
@@ -168,6 +263,26 @@ class Chat extends Component
             $this->summary = 'エラーが発生しました: '.$e->getMessage();
         } finally {
             $this->isSummarizing = false;
+        }
+    }
+
+    public function extractImportantInfo(AIModelService $aiService): void
+    {
+        if (! $this->activeChannel) {
+            return;
+        }
+
+        $this->summary = '';
+        $this->isExtracting = true;
+        $this->importantInfo = '';
+
+        try {
+            $userName = \EchoChat\Support\UserSupport::getName(auth()->user());
+            $this->importantInfo = $aiService->extractImportantInfo($this->activeChannel, $userName);
+        } catch (\Exception $e) {
+            $this->importantInfo = 'エラーが発生しました: '.$e->getMessage();
+        } finally {
+            $this->isExtracting = false;
         }
     }
 

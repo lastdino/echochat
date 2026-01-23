@@ -65,7 +65,7 @@
                                 wire:click="selectChannel({{ $channel->id }})"
                                 @contextmenu.prevent="let rect = $refs.sidebar.getBoundingClientRect(); open = true; x = $event.clientX - rect.left; y = $event.clientY - rect.top; type = 'channel'; channelId = {{ $channel->id }}; channelName = '{{ $channel->name }}'; canDelete = {{ Gate::check('delete', $channel) ? 'true' : 'false' }}"
                                 :current="$activeChannel && $activeChannel->id === $channel->id"
-                                :badge="isset($notifications[$channel->id]) ? $notifications[$channel->id] : 0"
+                                :badge="isset($notifications[$channel->id]) && $notifications[$channel->id] > 0 ? $notifications[$channel->id] : ($channel->unread_count > 0 ? $channel->unread_count : 0)"
                                 badge-color="blue"
                                 :icon="$channel->displayIcon"
                             >

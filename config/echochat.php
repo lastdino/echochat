@@ -56,17 +56,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Flux Pro Configuration
-    |--------------------------------------------------------------------------
-    |
-    | If you have a Flux Pro subscription, you can set this to true
-    | to enable Pro components like flux:composer and flux:editor.
-    |
-    */
-    'flux_pro' => env('ECHOCHAT_FLUX_PRO', false),
-
-    /*
-    |--------------------------------------------------------------------------
     | AI Configuration
     |--------------------------------------------------------------------------
     |

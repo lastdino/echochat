@@ -1,12 +1,20 @@
 {
     "name": "lastdino/echochat",
-    "description": "A Slack-like functionality package for Laravel.",
+    "description": "A workspace and channel based real-time chat functionality package for Laravel.",
+    "keywords": [
+        "laravel",
+        "chat",
+        "workspace",
+        "channel",
+        "realtime"
+    ],
+    "homepage": "https://github.com/lastdino/echochat",
     "type": "library",
     "license": "MIT",
     "authors": [
         {
-            "name": "Junie",
-            "email": "junie@example.com"
+            "name": "lastdino",
+            "email": "87484368+lastdino@users.noreply.github.com"
         }
     ],
     "require": {
@@ -14,6 +22,10 @@
         "laravel/framework": "^12.0",
         "livewire/livewire": "^4.0",
         "spatie/laravel-medialibrary": "^11.17"
+    },
+    "require-dev": {
+        "pestphp/pest": "^4.3",
+        "pestphp/pest-plugin-laravel": "^4.0"
     },
     "autoload": {
         "psr-4": {

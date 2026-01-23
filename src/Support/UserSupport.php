@@ -8,9 +8,6 @@ class UserSupport
 {
     /**
      * Get the display name for a user.
-     *
-     * @param  Model|null  $user
-     * @return string
      */
     public static function getName(?Model $user): string
     {

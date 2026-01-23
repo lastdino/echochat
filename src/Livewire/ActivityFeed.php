@@ -6,6 +6,7 @@ use EchoChat\Models\Channel;
 use EchoChat\Models\Message;
 use EchoChat\Models\Workspace;
 use EchoChat\Notifications\MentionedInMessage;
+use EchoChat\Notifications\ReplyInThread;
 use EchoChat\Support\UserSupport;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
@@ -72,11 +73,11 @@ class ActivityFeed extends Component
         $userId = auth()->id();
 
         // 1. メンション（通知から取得するのが確実）
-        $mentionsQuery = auth()->user()->notifications()
-            ->where('type', MentionedInMessage::class)
+        $notificationsQuery = auth()->user()->notifications()
+            ->whereIn('type', [MentionedInMessage::class, ReplyInThread::class])
             ->latest();
 
-        $mentions = $mentionsQuery->get()
+        $mentions = $notificationsQuery->get()
             ->filter(function ($notification) {
                 if ($this->showAllWorkspaces) {
                     return true;
@@ -84,15 +85,17 @@ class ActivityFeed extends Component
 
                 return (int) ($notification->data['workspace_id'] ?? 0) === (int) $this->workspace->id;
             })
-            ->take(20)
+            ->take(40)
             ->map(function ($notification) {
                 $message = Message::with(['user', 'channel.workspace'])->find($notification->data['message_id']);
                 if (! $message) {
                     return null;
                 }
 
+                $type = $notification->type === MentionedInMessage::class ? 'mention' : 'reply';
+
                 return [
-                    'type' => 'mention',
+                    'type' => $type,
                     'id' => $message->id,
                     'user_name' => UserSupport::getName($message->user),
                     'user_avatar' => $message->user->getUserAvatar(),
@@ -207,6 +210,15 @@ class ActivityFeed extends Component
         }
 
         $this->dispatch('setActivityMessage', messageId: $messageId, channelId: $channelId, clickId: now()->getTimestampMs());
+
+        // スレッド（返信）の場合はスレッドサイドバーも開く
+        if ($messageId) {
+            $message = \EchoChat\Models\Message::find($messageId);
+            if ($message && $message->parent_id) {
+                $this->dispatch('openThread', messageId: $message->parent_id)->to(Chat::class);
+            }
+        }
+
         $this->js("Flux.modal('activity-feed').close()");
     }
 

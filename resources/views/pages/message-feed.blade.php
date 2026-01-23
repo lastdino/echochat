@@ -18,7 +18,16 @@
             </div>
 
             <div x-show="open" x-collapse class="space-y-4">
+                @php $hasShownUnreadLabel = false; @endphp
                 @foreach($messages as $message)
+                    @if($lastReadAtDate && $message->created_at->gt($lastReadAtDate) && ! $hasShownUnreadLabel && $message->user_id !== auth()->id())
+                        <div class="flex items-center gap-4 my-2">
+                            <div class="flex-1 border-t border-red-500/50"></div>
+                            <span class="text-[10px] font-bold text-red-500 uppercase tracking-wider">ここから未読</span>
+                            <div class="flex-1 border-t border-red-500/50"></div>
+                        </div>
+                        @php $hasShownUnreadLabel = true; @endphp
+                    @endif
                     <x-echochat-message-item :message="$message" />
                 @endforeach
             </div>

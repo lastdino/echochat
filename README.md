@@ -1,12 +1,14 @@
 # EchoChat Package
 
-EchoChatは、LaravelアプリケーションにSlackのようなワークスペースおよびチャンネルベースのリアルタイム・チャット機能を追加するためのLaravelパッケージです。
+EchoChatは、Laravelアプリケーションにワークスペースおよびチャンネルベースのリアルタイム・チャット機能を追加するためのLaravelパッケージです。
 
 ## 特徴
 
 - **ワークスペース**: ユーザーが所属できる分離された環境を構築。
 - **チャンネル**: ワークスペース内のパブリック/プライベートな会話スペース。
 - **リアルタイムメッセージング**: Laravel Reverb/Pusherを通じたリアルタイム通信。
+- **スレッド機能**: メッセージに対する返信とスレッド一覧。
+- **AI要約**: GeminiやOllamaを使用したチャンネルメッセージの要約機能。
 - **リアクション**: 絵文字によるメッセージへのリアクション機能。
 - **添付ファイル**: メッセージへのファイル添付機能（Spatie MediaLibrary連携）。
 - **Livewire Volt連携**: モダンな単一ファイルコンポーネントによるUI提供。
@@ -24,24 +26,10 @@ EchoChatは、LaravelアプリケーションにSlackのようなワークスペ
 
 ### 1. パッケージの追加
 
-現在開発中のため、ローカルのリポジトリとして `composer.json` に追加するか、直接 `packages` ディレクトリに配置してオートロードを設定します。
+Composerを使用してパッケージをインストールします：
 
-`composer.json` の `autoload` セクションに以下を追加します：
-
-```json
-{
-    "autoload": {
-        "psr-4": {
-            "EchoChat\\": "packages/lastdino/echochat/src/",
-            "EchoChat\\Database\\Seeders\\": "packages/lastdino/echochat/database/seeders/"
-        }
-    }
-}
-```
-
-設定後、以下のコマンドを実行します：
 ```bash
-composer dump-autoload
+composer require lastdino/echochat
 ```
 
 ### 2. モデルの設定
@@ -68,7 +56,7 @@ class User extends Authenticatable implements HasMedia, HasWorkspaces
 php artisan migrate
 ```
 
-### 4. 設定とアセットの公開（任意）
+### 4. 設定とアセットの公開（任意、一部必須）
 
 設定ファイル、ビュー、カスタムアイコンなどをカスタマイズしたい場合に公開します：
 ```bash

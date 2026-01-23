@@ -61,6 +61,7 @@ class EchoChatServiceProvider extends ServiceProvider
         Livewire::component('echochat-chat', \EchoChat\Livewire\Chat::class);
         Livewire::component('echochat-message-feed', \EchoChat\Livewire\MessageFeed::class);
         Livewire::component('echochat-activity-feed', \EchoChat\Livewire\ActivityFeed::class);
+        Livewire::component('echochat-thread-list', \EchoChat\Livewire\ThreadList::class);
         Livewire::component('echochat-channel-list', \EchoChat\Livewire\ChannelList::class);
         Livewire::component('echochat-message-input', \EchoChat\Livewire\MessageInput::class);
         Livewire::component('echochat-message-input-pro', \EchoChat\Livewire\MessageInputPro::class);

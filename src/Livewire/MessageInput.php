@@ -6,7 +6,7 @@ use EchoChat\Events\MessageSent;
 use EchoChat\Models\Channel;
 use EchoChat\Models\ChannelUser;
 use EchoChat\Models\Message;
-use EchoChat\Notifications\MentionedInMessage;
+use EchoChat\Support\MessageSupport;
 use EchoChat\Support\UserSupport;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -24,6 +24,8 @@ class MessageInput extends Component
 
     public ?int $replyToId = null;
 
+    public bool $isThreadInput = false;
+
     public ?Message $replyToMessage = null;
 
     public $mentionSearch = '';
@@ -34,12 +36,29 @@ class MessageInput extends Component
 
     protected $listeners = [
         'setReplyTo' => 'setReplyTo',
+        'cancelReply' => 'cancelReply',
     ];
+
+    public function mount(Channel $channel, ?int $replyToId = null): void
+    {
+        $this->channel = $channel;
+        $this->replyToId = $replyToId;
+        $this->isThreadInput = ! is_null($replyToId);
+        if ($replyToId) {
+            $this->replyToMessage = Message::with('user')->find($replyToId);
+        }
+    }
 
     public function setReplyTo($messageId): void
     {
-        $this->replyToId = $messageId;
-        $this->replyToMessage = Message::with('user')->find($messageId);
+        // 統合方針：返信ボタンはスレッドを開くようになったため、
+        // このメソッドは（もし他から呼ばれても）スレッドを開くイベントをディスパッチするか、
+        // 互換性のために残す。ただし、インライン返信は行わない。
+        $message = Message::find($messageId);
+        if ($message) {
+            $parentId = $message->parent_id ?: $message->id;
+            $this->dispatch('openThread', messageId: $parentId)->to(Chat::class);
+        }
     }
 
     public function cancelReply(): void
@@ -94,67 +113,6 @@ class MessageInput extends Component
         $this->mentionIndex = 0;
     }
 
-    protected function notifyMentions(Message $message): void
-    {
-        if (empty($message->content)) {
-            return;
-        }
-
-        $content = $message->content;
-
-        // Check for @channel
-        $hasChannelMention = str_contains($content, '@channel');
-        if ($hasChannelMention) {
-            $content = str_replace('@channel', '___MENTION_DONE___', $content);
-            $membersToNotify = $this->channel->members()
-                ->where('user_id', '!=', auth()->id())
-                ->with('user')
-                ->get()
-                ->map(fn ($m) => $m->user);
-
-            foreach ($membersToNotify as $user) {
-                $user->notify(new MentionedInMessage($message, true));
-            }
-        }
-
-        // チャンネルメンバーの名前リストを取得（長い順にソートして部分一致を防ぐ）
-        $members = $this->channel->members()
-            ->with('user')
-            ->get()
-            ->map(fn ($m) => [
-                'user' => $m->user,
-                'name' => UserSupport::getName($m->user),
-            ])
-            ->filter(fn ($m) => ! empty($m['name']))
-            ->sortByDesc(fn ($m) => strlen($m['name']));
-
-        $mentionedUserIds = [];
-
-        foreach ($members as $member) {
-            $name = $member['name'];
-            $mention = '@'.$name;
-
-            // メッセージ内に @名前 が含まれているか確認（単語境界を考慮）
-            if (str_contains($content, $mention)) {
-                if ($member['user']->id !== auth()->id()) {
-                    $mentionedUserIds[] = $member['user']->id;
-                    // 他の名前と部分一致しないように、マッチした部分を置換して除外する
-                    $content = str_replace($mention, '___MENTION_DONE___', $content);
-                }
-            }
-        }
-
-        if (empty($mentionedUserIds)) {
-            return;
-        }
-
-        $mentionedUsers = \App\Models\User::whereIn('id', array_unique($mentionedUserIds))->get();
-
-        foreach ($mentionedUsers as $user) {
-            $user->notify(new MentionedInMessage($message));
-        }
-    }
-
     public function sendMessage(): void
     {
         $this->validate([
@@ -183,12 +141,19 @@ class MessageInput extends Component
         broadcast(new \EchoChat\Events\ChannelRead($this->channel, auth()->id()))->toOthers();
 
         // メンション通知の送信
-        $this->notifyMentions($message);
+        MessageSupport::notifyMentions($message);
+
+        // スレッド参加者への通知
+        MessageSupport::notifyThreadParticipants($message);
 
         $this->content = '';
         $this->attachments = [];
-        $this->replyToId = null;
-        $this->replyToMessage = null;
+
+        if (! $this->isThreadInput) {
+            $this->replyToId = null;
+            $this->replyToMessage = null;
+        }
+
         $this->dispatch('messageSent');
         $this->dispatch('channelRead', channelId: $this->channel->id);
     }
