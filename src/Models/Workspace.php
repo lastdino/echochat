@@ -16,7 +16,7 @@ class Workspace extends Model
         return Tables::name('workspaces');
     }
 
-    protected $fillable = ['name', 'slug', 'owner_id', 'allow_member_channel_creation', 'allow_member_channel_deletion', 'ai_prompt'];
+    protected $fillable = ['name', 'slug', 'owner_id', 'allow_member_channel_creation', 'allow_member_channel_deletion', 'ai_prompt', 'extract_ai_prompt'];
 
     protected $casts = [
         'allow_member_channel_creation' => 'boolean',

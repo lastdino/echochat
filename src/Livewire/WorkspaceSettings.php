@@ -19,6 +19,8 @@ class WorkspaceSettings extends Component
 
     public ?string $ai_prompt = null;
 
+    public ?string $extract_ai_prompt = null;
+
     public function mount(Workspace $workspace): void
     {
         Gate::authorize('update', $workspace);
@@ -28,6 +30,7 @@ class WorkspaceSettings extends Component
         $this->allow_member_channel_creation = $workspace->allow_member_channel_creation;
         $this->allow_member_channel_deletion = $workspace->allow_member_channel_deletion;
         $this->ai_prompt = $workspace->ai_prompt;
+        $this->extract_ai_prompt = $workspace->extract_ai_prompt;
     }
 
     public function save(): void
@@ -37,6 +40,7 @@ class WorkspaceSettings extends Component
         $this->validate([
             'name' => 'required|string|max:255',
             'ai_prompt' => 'nullable|string',
+            'extract_ai_prompt' => 'nullable|string',
         ]);
 
         $this->workspace->update([
@@ -44,6 +48,7 @@ class WorkspaceSettings extends Component
             'allow_member_channel_creation' => $this->allow_member_channel_creation,
             'allow_member_channel_deletion' => $this->allow_member_channel_deletion,
             'ai_prompt' => $this->ai_prompt,
+            'extract_ai_prompt' => $this->extract_ai_prompt,
         ]);
 
         if (class_exists(\Flux\Flux::class)) {

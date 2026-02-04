@@ -30,8 +30,8 @@
             <flux:separator variant="subtle" />
 
             <div>
-                <flux:heading level="3" class="mb-2">AI要約設定</flux:heading>
-                <flux:text class="mb-4">チャンネルのメッセージを要約する際のプロンプトをカスタマイズできます。</flux:text>
+                <flux:heading level="3" class="mb-2">AI設定</flux:heading>
+                <flux:text class="mb-4">AIによる要約や重要情報の抽出に使用するプロンプトをカスタマイズできます。</flux:text>
 
                 <flux:field>
                     <flux:label>要約プロンプト</flux:label>
@@ -45,6 +45,21 @@
                     </flux:description>
                     <flux:error name="ai_prompt" />
                 </flux:field>
+
+                <div class="mt-6">
+                    <flux:field>
+                        <flux:label>重要情報抽出プロンプト</flux:label>
+                        <flux:textarea
+                            wire:model="extract_ai_prompt"
+                            placeholder="以下のチャット履歴から、:userName 宛ての重要な情報を抽出してください。&#10;&#10;チャット履歴:&#10;:messages"
+                            rows="5"
+                        />
+                        <flux:description>
+                            <code>:userName</code> はユーザー名、<code>:messages</code> は実際のチャット履歴に置き換えられます。未入力の場合はデフォルトのプロンプトが使用されます。
+                        </flux:description>
+                        <flux:error name="extract_ai_prompt" />
+                    </flux:field>
+                </div>
             </div>
 
             <div class="flex">

@@ -68,6 +68,8 @@ return [
         'ollama_endpoint' => env('OLLAMA_ENDPOINT', 'http://localhost:11434/api/generate'),
         'ollama_model' => env('OLLAMA_MODEL', 'llama3'),
         'message_limit' => env('ECHOCHAT_AI_MESSAGE_LIMIT', 50),
-        'prompt' => env('ECHOCHAT_AI_PROMPT', "以下のチャット履歴を簡潔に日本語で要約してください。\n\n:messages"),
+        'timeout' => env('ECHOCHAT_AI_TIMEOUT', 60),
+        'summarize_prompt' => env('ECHOCHAT_AI_SUMMARIZE_PROMPT', "以下のチャット履歴を簡潔に日本語で要約してください。\n\n:messages"),
+        'extract_prompt' => env('ECHOCHAT_AI_EXTRACT_PROMPT', "以下のチャット履歴から、:userName 宛ての重要な依頼、質問、または :userName が確認すべき重要情報を抽出し、簡潔な箇条書きの日本語でまとめてください。関連する情報がない場合は「特に関連する重要な情報はありません」と回答してください。\n\nチャット履歴:\n:messages"),
     ],
 ];
