@@ -143,6 +143,48 @@ class Chat extends Component
         return \EchoChat\Support\MessageSupport::formatContent($content, $this->activeChannel);
     }
 
+    public function toggleReaction(int $messageId, string $emoji): void
+    {
+        $userId = auth()->id();
+        $reaction = \EchoChat\Models\MessageReaction::where('message_id', $messageId)
+            ->where('user_id', $userId)
+            ->where('emoji', $emoji)
+            ->first();
+
+        if ($reaction) {
+            $reaction->delete();
+            broadcast(new \EchoChat\Events\ReactionUpdated($reaction, 'removed'))->toOthers();
+        } else {
+            $reaction = \EchoChat\Models\MessageReaction::create([
+                'message_id' => $messageId,
+                'user_id' => $userId,
+                'emoji' => $emoji,
+            ]);
+            broadcast(new \EchoChat\Events\ReactionUpdated($reaction, 'added'))->toOthers();
+        }
+
+        // 自身の表示も更新するために必要なら
+        $this->dispatch('$refresh');
+    }
+
+    public function deleteAttachment(int $messageId, int $mediaId): void
+    {
+        $message = \EchoChat\Models\Message::findOrFail($messageId);
+
+        if ($message->user_id !== auth()->id()) {
+            return;
+        }
+
+        $media = $message->media()->find($mediaId);
+
+        if ($media) {
+            $media->delete();
+            $this->dispatch('messageSent'); // フィードを更新
+
+            broadcast(new \EchoChat\Events\MessageSent($message->load('media')))->toOthers();
+        }
+    }
+
     public function getAncestorIds($messageId): array
     {
         $ancestorIds = [];
