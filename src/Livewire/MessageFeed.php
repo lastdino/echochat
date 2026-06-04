@@ -94,13 +94,17 @@ class MessageFeed extends Component
                 ->with(['user', 'media', 'parent.user', 'reactions.user', 'replies.user'])
                 ->whereNull('parent_id')
                 ->latest()
+                ->orderByDesc('id')
                 ->limit($this->perPage + 1)
                 ->get();
 
             $hasMore = $fetched->count() > $this->perPage;
 
             $messages = $fetched->take($this->perPage)
-                ->sortBy('created_at')
+                ->sortBy([
+                    ['created_at', 'asc'],
+                    ['id', 'asc'],
+                ])
                 ->values();
         }
 

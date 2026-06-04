@@ -3,27 +3,41 @@
         <div
             wire:key="load-more-sentinel-{{ $channel->id }}"
             x-data="{
+                loading: false,
+                observer: null,
                 init() {
                     const root = this.$el.closest('.overflow-y-auto');
-                    const observer = new IntersectionObserver((entries) => {
-                        entries.forEach(entry => {
-                            if (entry.isIntersecting && ! $wire.__loadingMore) {
-                                $wire.__loadingMore = true;
-                                const previousHeight = root ? root.scrollHeight : 0;
-                                $wire.loadMore().then(() => {
-                                    if (root) {
-                                        this.$nextTick(() => {
-                                            root.scrollTop = root.scrollHeight - previousHeight;
-                                            $wire.__loadingMore = false;
-                                        });
-                                    } else {
-                                        $wire.__loadingMore = false;
-                                    }
-                                });
-                            }
+
+                    this.observer = new IntersectionObserver((entries) => {
+                        const entry = entries[0];
+
+                        if (! entry || ! entry.isIntersecting || this.loading) {
+                            return;
+                        }
+
+                        this.loading = true;
+
+                        const previousHeight = root ? root.scrollHeight : 0;
+                        const previousTop = root ? root.scrollTop : 0;
+
+                        $wire.loadMore().then(() => {
+                            this.$nextTick(() => {
+                                if (root) {
+                                    root.scrollTop = previousTop + (root.scrollHeight - previousHeight);
+                                }
+                                this.loading = false;
+                            });
+                        }).catch(() => {
+                            this.loading = false;
                         });
                     }, { root: root, threshold: 0.1 });
-                    observer.observe(this.$el);
+
+                    this.observer.observe(this.$el);
+                },
+                destroy() {
+                    if (this.observer) {
+                        this.observer.disconnect();
+                    }
                 }
             }"
             class="flex justify-center py-3"
