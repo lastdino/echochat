@@ -56,6 +56,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Messages Per Page
+    |--------------------------------------------------------------------------
+    |
+    | The number of top-level messages loaded initially in the message feed.
+    | Older messages are fetched in batches of this size as the user scrolls
+    | up, keeping channels with a large number of messages fast to load.
+    |
+    */
+    'messages_per_page' => env('ECHOCHAT_MESSAGES_PER_PAGE', 30),
+
+    /*
+    |--------------------------------------------------------------------------
     | AI Configuration
     |--------------------------------------------------------------------------
     |

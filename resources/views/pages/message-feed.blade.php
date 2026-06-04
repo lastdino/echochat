@@ -1,4 +1,37 @@
 <div class="p-4 space-y-4">
+    @if(($hasMore ?? false) && trim($search) === '')
+        <div
+            wire:key="load-more-sentinel-{{ $channel->id }}"
+            x-data="{
+                init() {
+                    const root = this.$el.closest('.overflow-y-auto');
+                    const observer = new IntersectionObserver((entries) => {
+                        entries.forEach(entry => {
+                            if (entry.isIntersecting && ! $wire.__loadingMore) {
+                                $wire.__loadingMore = true;
+                                const previousHeight = root ? root.scrollHeight : 0;
+                                $wire.loadMore().then(() => {
+                                    if (root) {
+                                        this.$nextTick(() => {
+                                            root.scrollTop = root.scrollHeight - previousHeight;
+                                            $wire.__loadingMore = false;
+                                        });
+                                    } else {
+                                        $wire.__loadingMore = false;
+                                    }
+                                });
+                            }
+                        });
+                    }, { root: root, threshold: 0.1 });
+                    observer.observe(this.$el);
+                }
+            }"
+            class="flex justify-center py-3"
+        >
+            <flux:icon icon="arrow-path" class="w-5 h-5 animate-spin text-zinc-400" />
+        </div>
+    @endif
+
     @foreach($groupedMessages as $date => $messages)
         <div
             x-data="{ open: true }"

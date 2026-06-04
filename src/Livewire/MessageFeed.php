@@ -16,14 +16,22 @@ class MessageFeed extends Component
 
     public ?string $lastReadAt = null;
 
+    public int $perPage = 30;
+
     public function mount(Channel $channel): void
     {
         $this->channel = $channel;
+        $this->perPage = (int) config('echochat.messages_per_page', 30);
         $this->lastReadAt = \EchoChat\Models\ChannelUser::where('channel_id', $channel->id)
             ->where('user_id', auth()->id())
             ->first()
             ?->last_read_at
             ?->toDateTimeString();
+    }
+
+    public function loadMore(): void
+    {
+        $this->perPage += (int) config('echochat.messages_per_page', 30);
     }
 
     public function getListeners(): array
@@ -44,7 +52,13 @@ class MessageFeed extends Component
 
     public function handleIncomingMessage(): void
     {
-        // 自身の状態を更新するために必要なら $refresh
+        // 新着メッセージを表示窓に取り込む。検索中でない場合は
+        // 既に読み込んだメッセージを押し出さないよう表示件数を1件分広げ、
+        // Livewire の差分描画（wire:key）により新着分だけが DOM に追記される。
+        if (trim($this->search) === '') {
+            $this->perPage++;
+        }
+
         $this->dispatch('$refresh');
     }
 
@@ -55,30 +69,46 @@ class MessageFeed extends Component
 
     public function render(): View
     {
-        $query = $this->channel->messages()
-            ->with(['user', 'media', 'parent.user', 'reactions.user', 'replies.user'])
-            ->oldest();
+        $hasMore = false;
 
         if (trim($this->search) !== '') {
+            // 検索中は全件を対象にする（ページネーションなし）
             $searchTerm = '%'.trim($this->search).'%';
-            $query->where(function ($q) use ($searchTerm) {
-                $q->where('content', 'like', $searchTerm)
-                    ->orWhereHas('user', function ($uq) use ($searchTerm) {
-                        $uq->where('name', 'like', $searchTerm);
-                    })
-                    ->orWhereHas('media', function ($mq) use ($searchTerm) {
-                        $mq->where('file_name', 'like', $searchTerm);
-                    });
-            });
+            $messages = $this->channel->messages()
+                ->with(['user', 'media', 'parent.user', 'reactions.user', 'replies.user'])
+                ->where(function ($q) use ($searchTerm) {
+                    $q->where('content', 'like', $searchTerm)
+                        ->orWhereHas('user', function ($uq) use ($searchTerm) {
+                            $uq->where('name', 'like', $searchTerm);
+                        })
+                        ->orWhereHas('media', function ($mq) use ($searchTerm) {
+                            $mq->where('file_name', 'like', $searchTerm);
+                        });
+                })
+                ->oldest()
+                ->get();
         } else {
-            // 検索中でない場合はトップレベルのメッセージのみ取得
-            $query->whereNull('parent_id');
+            // 検索中でない場合は最新の perPage 件（トップレベルのみ）を取得し、
+            // 表示は古い順に並べ直す。上スクロールで loadMore() により過去分を追加読み込みする。
+            $fetched = $this->channel->messages()
+                ->with(['user', 'media', 'parent.user', 'reactions.user', 'replies.user'])
+                ->whereNull('parent_id')
+                ->latest()
+                ->limit($this->perPage + 1)
+                ->get();
+
+            $hasMore = $fetched->count() > $this->perPage;
+
+            $messages = $fetched->take($this->perPage)
+                ->sortBy('created_at')
+                ->values();
         }
 
-        $groupedMessages = $query->get()->groupBy(fn ($message) => $message->created_at->translatedFormat(config('echochat.date_format', 'n月j日 (D)')));
+        $groupedMessages = $messages->groupBy(fn ($message) => $message->created_at->translatedFormat(config('echochat.date_format', 'n月j日 (D)')));
 
         return view('echochat::pages.message-feed', [
             'groupedMessages' => $groupedMessages,
+            'hasMore' => $hasMore,
             'lastReadAtDate' => $this->lastReadAt ? \Carbon\Carbon::parse($this->lastReadAt) : null,
         ]);
     }
